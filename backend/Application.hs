@@ -61,11 +61,12 @@ makeFoundation appSettings = do
     -- logging function. To get out of this loop, we initially create a
     -- temporary foundation without a real connection pool, get a log function
     -- from there, and then create the real foundation.
-    let mkFoundation appConnPool = App {..}
+    let mkFoundation appConnPool appConnPoolRO = App {..}
         -- The App {..} syntax is an example of record wild cards. For more
         -- information, see:
         -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-        tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
+        tempFoundation = mkFoundation (error "connPool forced")
+          (error "connPool forced in tempFoundation")
         logFunc = messageLoggerSource tempFoundation appLogger
 
     -- Create the database connection pool
@@ -73,11 +74,16 @@ makeFoundation appSettings = do
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
 
+    -- Create another for read-only db
+    poolRO <- flip runLoggingT logFunc $ createSqlitePool
+        (sqlDatabase $ appDatabaseConfRO appSettings)
+        (sqlPoolSize $ appDatabaseConfRO appSettings)
+
     -- Perform database migration using our application's logging settings.
     runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
     -- Return the foundation
-    return $ mkFoundation pool
+    return $ mkFoundation pool poolRO
 
 -- | Convert our foundation to a WAI Application by calling @toWaiAppPlain@ and
 -- applying some additional middlewares.

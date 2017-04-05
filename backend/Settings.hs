@@ -27,6 +27,8 @@ data AppSettings = AppSettings
     -- ^ Directory from which to serve static files.
     , appDatabaseConf           :: SqliteConf
     -- ^ Configuration settings for accessing the database.
+    , appDatabaseConfRO         :: SqliteConf
+    -- ^ Configuration settings for accessing the read-only database.
     , appRoot                   :: Maybe Text
     -- ^ Base for all generated URLs. If @Nothing@, determined
     -- from the request headers.
@@ -69,6 +71,7 @@ instance FromJSON AppSettings where
 #endif
         appStaticDir              <- o .: "static-dir"
         appDatabaseConf           <- o .: "database"
+        appDatabaseConfRO         <- o .: "database-readonly"
         appRoot                   <- o .:? "approot"
         appHost                   <- fromString <$> o .: "host"
         appPort                   <- o .: "port"

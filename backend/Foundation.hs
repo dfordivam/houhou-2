@@ -23,6 +23,7 @@ data App = App
     { appSettings    :: AppSettings
     , appStatic      :: Static -- ^ Settings for static file serving.
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
+    , appConnPoolRO  :: ConnectionPool -- ^ A read-only Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
     }
@@ -188,6 +189,7 @@ instance YesodPersist App where
     runDB action = do
         master <- getYesod
         runSqlPool action $ appConnPool master
+
 instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
 
@@ -237,6 +239,11 @@ instance RenderMessage App FormMessage where
 -- This can also be useful for writing code that works across multiple Yesod applications.
 instance HasHttpManager App where
     getHttpManager = appHttpManager
+
+-- Only read permitted
+readDB action = do
+    master <- getYesod
+    runSqlPool action $ appConnPoolRO master
 
 unsafeHandler :: App -> Handler a -> IO a
 unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger
