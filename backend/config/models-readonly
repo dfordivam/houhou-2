@@ -4,27 +4,27 @@ Kanji                         sql=KanjiSet
     Id                        sql=ID
     character     Text        sql=Character
     strokeCount   Int         sql=StrokeCount
-    grade         Int         sql=Grade
-    mostUsedRank  Int         sql=MostUsedRank
-    jlptLevel     Int         sql=JlptLevel
-    onyomi        Text        sql=OnYomi
-    kunyomi       Text        sql=KunYomi
-    nanori        Text        sql=Nanori
+    grade         Int  Maybe  sql=Grade
+    mostUsedRank  Int  Maybe  sql=MostUsedRank
+    jlptLevel     Int  Maybe  sql=JlptLevel
+    onyomi        Text Maybe  sql=OnYomi
+    kunyomi       Text Maybe  sql=KunYomi
+    nanori        Text Maybe  sql=Nanori
     unicodeValue  Int         sql=UnicodeValue
-    newpaperRank  Int         sql=NewspaperRank
-    wkLevel       Int         sql=WkLevel
+    newpaperRank  Int  Maybe  sql=NewspaperRank
+    wkLevel       Int  Maybe  sql=WkLevel
     deriving Show
 
 Vocab                         sql=VocabSet
     Id                        sql=ID
-    kanjiWriting  Text        sql=KanjiWriting
+    kanjiWriting  Text Maybe  sql=KanjiWriting
     kanaWriting   Text        sql=KanaWriting
     isCommon      Bool        sql=IsCommon
-    freqRank      Int         sql=FrequencyRank
-    furigana      Text        sql=Furigana
-    jlptLevel     Int         sql=JlptLevel
-    wkLevel       Int         sql=WkLevel
-    wikiRank      Int         sql=WikiRank
+    freqRank      Int  Maybe  sql=FrequencyRank
+    furigana      Text Maybe  sql=Furigana
+    jlptLevel     Int  Maybe  sql=JlptLevel
+    wkLevel       Int  Maybe  sql=WkLevel
+    wikiRank      Int  Maybe  sql=WikiRank
     groupId       Int         sql=GroupId
     isMain        Bool        sql=IsMain
     deriving Show
@@ -37,6 +37,7 @@ Radical                       sql=RadicalSet
 KanjiRadical                  sql=KanjiRadical
     kanji         KanjiId     sql=Kanji_ID
     radical       RadicalId   sql=Radicals_ID
+    Primary kanji radical
     deriving Show
 
 KanjiStrokes                  sql=KanjiStrokes
@@ -46,7 +47,7 @@ KanjiStrokes                  sql=KanjiStrokes
 KanjiMeaning                  sql=KanjiMeaningSet
     Id                        sql=ID
     kanji         KanjiId     sql=Kanji_ID
-    language      Text        sql=Language
+    language      Text Maybe  sql=Language
     meaning       Text        sql=Character
     deriving Show
 
@@ -64,21 +65,25 @@ VocabMeaning                  sql=VocabMeaningSet
 VocabEntityVocabMeaning       sql=VocabEntityVocabMeaning
     vocab         VocabId     sql=VocabEntity_ID
     meaning    VocabMeaningId sql=Meanings_ID
+    Primary vocab meaning
     deriving Show
 
 VocabMeaningVocabCategory     sql=VocabMeaningVocabCategory
     meaning   VocabMeaningId  sql=VocabMeaningVocabCategory_VocabCategory_ID
     category  VocabCategoryId sql=Categories_ID
+    Primary meaning category
     deriving Show
 
 VocabCategoryVocabEntity      sql=VocabCategoryVocabEntity
     vocab     VocabId         sql=VocabCategoryVocabEntity_VocabCategory_ID
     category  VocabCategoryId sql=Categories_ID
+    Primary category vocab
     deriving Show
 
 KanjiEntityVocabEntity        sql=KanjiEntityVocabEntity
     vocab         VocabId     sql=Vocabs_ID
     kanji         KanjiId     sql=Kanji_ID
+    Primary kanji vocab
     deriving Show
 
 
