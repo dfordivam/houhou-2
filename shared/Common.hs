@@ -36,46 +36,53 @@ newtype NanoriT = NanoriT { unNanoriT :: Text }
 -- Kanji Widget related data
 
 data KanjiFilter = KanjiFilter
-  {
-    textContent :: Text
+  { textContent :: Text
   , filter :: (Text, FilterOption)
   , selectedRadicals :: [RadicalId]
   }
 
-data KanjiList = KanjiList [(KanjiId, KanjiT, RankT, MeaningT)]
+data KanjiList =
+  KanjiList [(KanjiId, KanjiT, RankT, MeaningT)]
   deriving (Generic, Show)
 
 data KanjiDetails =
-  KanjiDetails KanjiT RankT MeaningT GradeT MostUsedRankT
-    JlptLevelT WkLevelT OnYomiT KunYomiT NanoriT
+  KanjiDetails KanjiT
+               RankT
+               MeaningT
+               GradeT
+               MostUsedRankT
+               JlptLevelT
+               WkLevelT
+               OnYomiT
+               KunYomiT
+               NanoriT
 
 
 data VocabDisplay = VocabDisplay
-  {
-    vocabDispFilter :: (Text, Text, Bool, Bool)
+  { vocabDispFilter :: (Text, Text, Bool, Bool)
   , vocabList :: [VocabDispItem]
   }
 -- Instance declarations
 instance ToJSON KanjiT where
-    toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 instance FromJSON KanjiT
 
 instance ToJSON RankT where
-    toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 instance FromJSON RankT
 
 instance ToJSON MeaningT where
-    toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 instance FromJSON MeaningT
 
 instance ToJSON KanjiList where
-    toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 instance FromJSON KanjiList
 
 instance ToJSON ClientReq where
-    toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 instance FromJSON ClientReq
 
 instance ToJSON Response where
-    toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 instance FromJSON Response
