@@ -50,6 +50,9 @@
                             A Widget's Html, Css and Javascript are separated in three files with the
                             <tt>.hamlet</tt>, <tt>.lucius</tt> and <tt>.julius</tt> extensions.
 
+
+                        <li>
+                            Kanji Count = #{kanjiCount}
                         <li .list-group-item ##{aDomId}>
                             If you had javascript enabled then you wouldn't be seeing this.
 

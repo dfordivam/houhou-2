@@ -22,6 +22,10 @@ getHomeR = do
     (formWidget, formEnctype) <- generateFormPost sampleForm
     let submission = Nothing :: Maybe FileForm
         handlerName = "getHomeR" :: Text
+    (kanjiCount, kanji) <- readDB $ do
+      allKanji <- selectList ([] :: [Filter Kanji]) []
+      kanji <- selectFirst ([] :: [Filter Kanji]) []
+      return $ (length allKanji, kanji)
     defaultLayout $ do
         let (commentFormId, commentTextareaId, commentListId) = commentIds
         aDomId <- newIdent
@@ -36,6 +40,10 @@ postHomeR = do
             FormSuccess res -> Just res
             _ -> Nothing
 
+    (kanjiCount, kanji) <- readDB $ do
+      allKanji <- selectList ([] :: [Filter Kanji]) []
+      kanji <- selectFirst ([] :: [Filter Kanji]) []
+      return $ (length allKanji, kanji)
     defaultLayout $ do
         let (commentFormId, commentTextareaId, commentListId) = commentIds
         aDomId <- newIdent
