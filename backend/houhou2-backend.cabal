@@ -12,7 +12,7 @@ Flag library-only
     Default:       False
 
 library
-    hs-source-dirs: ., app, src-shared
+    hs-source-dirs: ., app
     exposed-modules: Application
                      Foundation
                      Import
@@ -25,7 +25,6 @@ library
                      Handler.Comment
                      Handler.Profile
                      Handler.Kanji
-                     Message
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
@@ -94,6 +93,7 @@ library
                  , case-insensitive
                  , wai
                  , yesod-websockets
+                 , houhou2-shared
 
 executable         houhou2-backend
     if flag(library-only)

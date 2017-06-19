@@ -1,5 +1,5 @@
 name:              houhou2-frontend
-version:           0.0.0
+version:           0.1.0
 cabal-version:     >= 1.8
 build-type:        Simple
 copyright: 2017 Divam Narula <dfordivam@gmail.com>
@@ -11,10 +11,9 @@ author: Divam Narula <dfordivam@gmail.com>
 
 executable         houhou2-frontend
     main-is:           main.hs
-    hs-source-dirs:  src, src-shared
+    hs-source-dirs:  src
     other-modules:
                 KanjiBrowser
-                Message
 
     extensions:
                 OverloadedStrings
@@ -41,8 +40,10 @@ executable         houhou2-frontend
                 , ghcjs-dom
                 , reflex
                 , reflex-dom
+                , reflex-dom-core
                 , file-embed
                 , uri-bytestring
+                , houhou2-shared
 
   if impl(ghcjs)
     build-depends: ghcjs-base

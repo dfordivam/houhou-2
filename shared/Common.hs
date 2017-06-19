@@ -1,13 +1,15 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Common
   where
 
-import GHC.Generics
+import ClassyPrelude
+-- import GHC.Generics
 import Data.Aeson
-import Prelude
+import qualified Data.Map as Map
 
-import Data.Text
+-- import Data.Text
 
 -- New Types
 newtype KanjiT = KanjiT { unKanjiT :: Text }
@@ -32,18 +34,37 @@ newtype KunYomiT = KunYomiT { unKunYomiT :: Text }
   deriving (Generic, Show)
 newtype NanoriT = NanoriT { unNanoriT :: Text }
   deriving (Generic, Show)
+newtype RadicalId = RadicalId { unRadicalId :: Int }
+  deriving (Generic, Show, Eq, Ord)
+newtype KanjiId = KanjiId { unKanjiId :: Int }
+  deriving (Generic, Show, Eq, Ord)
 
 -- Kanji Widget related data
 
+data RadicalDetails =
+  RadicalDetails String
+  deriving (Generic, Show)
+
+type RadicalTable = Map RadicalId RadicalDetails
+
+radicalTable :: RadicalTable
+radicalTable = Map.fromList $
+  [(RadicalId 1, RadicalDetails "a")
+  ,(RadicalId 2, RadicalDetails "b")
+  ,(RadicalId 3, RadicalDetails "c")]
+
 data KanjiFilter = KanjiFilter
   { textContent :: Text
-  , filter :: (Text, FilterOption)
+  , filter :: (Text, FilterOptions)
   , selectedRadicals :: [RadicalId]
   }
-
-data KanjiList =
-  KanjiList [(KanjiId, KanjiT, RankT, MeaningT)]
   deriving (Generic, Show)
+
+data FilterOptions = OnYomi | KonYumi | Nanori
+  deriving (Generic, Show)
+
+type KanjiList =
+   [(KanjiId, KanjiT, RankT, MeaningT)]
 
 data KanjiDetails =
   KanjiDetails KanjiT
@@ -56,12 +77,18 @@ data KanjiDetails =
                OnYomiT
                KunYomiT
                NanoriT
+  deriving (Generic, Show)
 
 
 data VocabDisplay = VocabDisplay
   { vocabDispFilter :: (Text, Text, Bool, Bool)
   , vocabList :: [VocabDispItem]
   }
+  deriving (Generic, Show)
+
+data VocabDispItem = VocabDispItem
+  deriving (Generic, Show)
+
 -- Instance declarations
 instance ToJSON KanjiT where
   toEncoding = genericToEncoding defaultOptions
@@ -75,14 +102,50 @@ instance ToJSON MeaningT where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON MeaningT
 
-instance ToJSON KanjiList where
+instance ToJSON RadicalId where
   toEncoding = genericToEncoding defaultOptions
-instance FromJSON KanjiList
+instance FromJSON RadicalId
 
-instance ToJSON ClientReq where
+instance ToJSON KanjiId where
   toEncoding = genericToEncoding defaultOptions
-instance FromJSON ClientReq
+instance FromJSON KanjiId
 
-instance ToJSON Response where
+instance ToJSON KanjiDetails where
   toEncoding = genericToEncoding defaultOptions
-instance FromJSON Response
+instance FromJSON KanjiDetails
+
+instance ToJSON GradeT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON GradeT
+
+instance ToJSON MostUsedRankT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON MostUsedRankT
+instance ToJSON JlptLevelT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON JlptLevelT
+instance ToJSON StrokeCountT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON StrokeCountT
+instance ToJSON WkLevelT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON WkLevelT
+instance ToJSON OnYomiT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON OnYomiT
+instance ToJSON KunYomiT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON KunYomiT
+instance ToJSON NanoriT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON NanoriT
+instance ToJSON VocabDisplay where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON VocabDisplay
+
+instance ToJSON VocabDispItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON VocabDispItem
+-- instance ToJSON  where
+--   toEncoding = genericToEncoding defaultOptions
+-- instance FromJSON

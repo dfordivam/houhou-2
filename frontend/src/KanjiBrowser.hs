@@ -12,59 +12,100 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
-enc :: (ToJSON a, Functor f) => f a -> f [ByteString]
-enc mes = (:[]) <$> BSL.toStrict <$> encode <$> mes
-
--- Kanji Widget Contents
---   To search kanji
---     User text input
---     Search by meaning, reading, etc
---     Radical Table
---   Display list of kanji based on filters
---   Kanji Page
---     Kanji Details
---     Kanji -> Vocab list
---       Kana, meaning filter
-
--- Local Data
+import Reflex.Dom.Contrib.WithWebSocket.Class
 
 kanjiBrowseWidget = do
-  text "Here is Kanji list"
+
+  rec
+    let
+      (validRadicalsEv,kanjiListEv)
+        = splitE (\KanjiFilterResult a b -> (a,b)) <$> filterResultEv
+    filterEv <- kanjiFilterWidget validRadicalsEv
+
+    filterResultEv <- getWebSocketResponse (DoKanjiFilter <$> filterEv)
+
+    kanjiSelectionEv <- kanjiListWidget kanjiListEv
+
+    kanjiDetailsEv <- getWebSocketResponse
+      (GetKanjiDetails <$> kanjiSelectionEv)
+
+    kanjiDetailsWidget kanjiDetailsEv
 
   return ()
+-- Widget to show kanjifilter
 
-searchBar = do
-  text
+kanjiFilterWidget :: Event t [RadicalId] -> m (Event t KanjiFilter)
+kanjiFilterWidget = do
+  sentenceTextArea <- textArea def
+  readingTextInput <- textInput def
+  readingSelectionDropDown <- dropdown
+    KonYumi
+    (constDyn ((KonYumi =: "Kunyomi") <> (OnYomi =: "Onyomi ")))
+    def
 
-radicalTable (RadicalMatrix ) = undefined
-kanjiListTable (KanjiList lst) = do
-  el "table" $ do
-    let rowItem (k,r,m) = do
-          el "tr" $ do
-            el "td" $ text (unKanjiT k)
-            el "td" $ text (getRankMessage r)
-            el "td" $ text (unMeaningT m)
-        getRankMessage (RankT i) =
-          case (mod i 10) of
-            1 -> T.pack $ show i ++ "st"
-            2 -> T.pack $ show i ++ "nd"
-            3 -> T.pack $ show i ++ "rd"
-            _ -> T.pack $ show i ++ "th"
-    mapM rowItem lst
+  selectedRadicals <- radicalMatrix validRadicalsEv
+  let
+    kanjiFilter = KanjiFilter <$> (value sentenceTextArea)
+          <*> (zipDynWith (,) (value readingTextInput)
+              (value readingSelectionDropDown))
+          <*> selectedRadicals
 
-kanjiPage = undefined
+  return $ updated kanjiFilter
 
-kanjiWidgetControlCode = do
-  refreshEv <- button "Refresh"
+radicalMatrix :: Event t [RadicalId] -> m (Dynamic t [RadicalId])
+radicalMatrix evValid = do
 
-  let url = "localhost:3000"
-      eventMessage = enc $ const ClientReq <$> refreshEv
-  ws <- webSocket ("ws://" <> url <> "/kanji/list/") $
-    def & webSocketConfig_send .~ eventMessage
+  let
+    renderMatrix = do
+      el "ul" $ mapM showRadical (toList radicalTable)
 
-  let handleEv ev _ =
-        case (decodeStrict ev) of
-          Just (KanjiBrowserResp kl) -> Just kl
-          _ -> Nothing
+    showRadical (i,r) =
+      let valid = member i <$> validRadicals
+          sel = member i <$> selectedRadicals
+          -- (Valid, Selected)
+          cl (False,_) = "secondary label"
+          cl (True, True) = "primary label"
+          cl _ = ""
+          attr = (\c -> ("class" =: c)) <$>
+                   (cl <$> combineDyn valid sel)
 
-  klDyn <- foldDynMaybe handleEv (KanjiList []) (_webSocket_recv ws)
+      (e,_) <- el' "li" $
+        elDynAttr "span" attr $ text (show r)
+      let ev = attachPromptlyDynWithMaybe f valid
+                 (domEvent Click e)
+          f (True,_) = Just ()
+          f _ = Nothing
+      return (i <$ ev)
+
+  validRadicals :: Dynamic t (Set RadicalId)
+  validRadicals <- holdDyn (keys radicalTable) evValid
+
+  ev <- renderMatrix validRadicals
+
+  selectedRadicals :: Dynamic t (Set RadicalId)
+  selectedRadicals <- foldDyn h empty ev
+  let h s i = if member i s then delete i s else insert i s
+
+  return $ toList <$> selectedRadicals
+
+
+kanjiListWidget :: Event t KanjiList -> m (Event t KanjiId)
+kanjiListWidget listEv = do
+  let kanjiTable itms = do
+        el "table" $ do
+          let listItem itm@(i, _, _, _) = do
+                (e, _) <- el' "tr" $ el "td" $ show itm
+                return (i <$ domEvent Click e)
+          mapM listItem itms
+  leftmost =<< widgetHold (return never) (kanjiTable <$> listEv)
+  -- show list
+
+kanjiDetailsWidget :: Event t KanjiSelectionDetails -> m ()
+kanjiDetailsWidget (KanjiSelectionDetails k v) = do
+  kanjiDetailWindow k
+  vocabListWindow v
+
+kanjiDetailWindow :: KanjiDetails -> m ()
+kanjiDetailWindow k = divClass "" $ text (show k)
+vocabListWindow :: VocabDisplay -> m ()
+vocabListWindow v = divClass "" $ text (show v)

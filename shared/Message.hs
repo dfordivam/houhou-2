@@ -1,27 +1,32 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Message
   where
 
 import Common
-import GHC.Generics
+import ClassyPrelude
 import Data.Aeson
-import Prelude
-import Data.Text
 
 -- Messages
 
-class (ToJSON req, FromJSON req, ToJSON (Response req), FromJSON (Response req)) =>
-      IsRequest req where
-  type Response req :: * -> *
 
-data ClientReq
-  = DoKanjiFilter KanjiFilter
-  | GetKanjiDetails KanjiId
+-- data ClientReq
+--   = DoKanjiFilter KanjiFilter
+--   | GetKanjiDetails KanjiId
+--   deriving (Generic, Show)
+
+data KanjiFilterResult =
+  KanjiFilterResult KanjiList --
+                    [RadicalId] -- Valid Radicals
   deriving (Generic, Show)
 
-data Response
-  = KanjiListResp KanjiList
-  | KanjiSelectionResp KanjiDetails
-                       VocabDisplay
+data KanjiSelectionDetails =
+  KanjiSelectionDetails KanjiDetails
+                        VocabDisplay
   deriving (Generic, Show)
+
+instance ToJSON KanjiSelectionDetails where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON KanjiSelectionDetails
+
+instance ToJSON KanjiFilterResult where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON KanjiFilterResult
