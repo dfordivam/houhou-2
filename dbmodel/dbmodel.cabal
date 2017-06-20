@@ -1,8 +1,8 @@
-name:                dbinterface
+name:                dbmodel
 version:             0.1.0.0
 -- synopsis:
 -- description:
-homepage:            https://github.com/dfordivam/dbinterface#readme
+homepage:            https://github.com/dfordivam/dbmodel#readme
 author:              Divam Narula
 maintainer:          dfordivam@gmail.com
 copyright:           All rights reserved
@@ -12,10 +12,11 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
 
 library
-  exposed-modules:     DB
-                       , Interface
-  -- other-modules:
+  exposed-modules:     Model
+                       , DBInstances
+                       , JSONInstances
   hs-source-dirs:      src
+  main-is:             Main.hs
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
                      , OverloadedStrings
@@ -25,12 +26,8 @@ library
                      , TypeFamilies
                      , DeriveGeneric
                      , UndecidableInstances
-
   build-depends:       base >= 4.7 && < 5
                      , protolude
                      , beam-core
                      , aeson
-                     , sqlite-simple
-                     , beam-sqlite
                      , lens
-                     , dbmodel

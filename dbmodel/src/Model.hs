@@ -1,8 +1,10 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Model where
 
 import Protolude
 import Database.Beam
-
+import Control.Lens.TH
 
 data KanjiT f = Kanji {
     _kanjiId             :: C f (Auto Int)
@@ -20,7 +22,10 @@ data KanjiT f = Kanji {
   }
   deriving (Generic)
 
+makeLenses ''KanjiT
+
 type Kanji = KanjiT Identity
+deriving instance Show Kanji
 
 -- KanjiDB                       sql=KanjiSet
 --     Id                        sql=ID
