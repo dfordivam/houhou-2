@@ -13,3 +13,12 @@ type KanjiId = PrimaryKey KanjiT Identity
 
 instance Beamable KanjiT
 instance Beamable (PrimaryKey KanjiT)
+
+instance Table VocabT where
+    data PrimaryKey VocabT f = VocabId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = VocabId . _vocabId
+
+type VocabId = PrimaryKey VocabT Identity
+
+instance Beamable VocabT
+instance Beamable (PrimaryKey VocabT)

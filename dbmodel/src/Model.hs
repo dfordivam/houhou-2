@@ -27,20 +27,26 @@ makeLenses ''KanjiT
 type Kanji = KanjiT Identity
 deriving instance Show Kanji
 
--- KanjiDB                       sql=KanjiSet
---     Id                        sql=ID
---     character     Text        sql=Character
---     strokeCount   Int         sql=StrokeCount
---     grade         Int  Maybe  sql=Grade
---     mostUsedRank  Int  Maybe  sql=MostUsedRank
---     jlptLevel     Int  Maybe  sql=JlptLevel
---     onyomi        Text Maybe  sql=OnYomi
---     kunyomi       Text Maybe  sql=KunYomi
---     nanori        Text Maybe  sql=Nanori
---     unicodeValue  Int         sql=UnicodeValue
---     newpaperRank  Int  Maybe  sql=NewspaperRank
---     wkLevel       Int  Maybe  sql=WkLevel
---     deriving Show
+
+data VocabT f = Vocab {
+    _vocabId             :: C f (Auto Int)
+  , _vocabKanjiWriting   :: C f (Maybe Text)
+  , _vocabKanaWriting    :: C f (Text)
+  , _vocabIsCommon       :: C f (Bool)
+  , _vocabFreqRank       :: C f (Maybe Int)
+  , _vocabFurigana       :: C f (Maybe Text)
+  , _vocabJlptLevel      :: C f (Maybe Int)
+  , _vocabWkLevel        :: C f (Maybe Int)
+  , _vocabWikiRank       :: C f (Maybe Int)
+  , _vocabGroupId        :: C f (Int)
+  , _vocabIsMain         :: C f (Bool)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabT
+
+type Vocab = VocabT Identity
+deriving instance Show Vocab
 
 -- VocabDB                       sql=VocabSet
 --     Id                        sql=ID
