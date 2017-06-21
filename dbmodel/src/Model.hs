@@ -26,7 +26,16 @@ makeLenses ''KanjiT
 
 type Kanji = KanjiT Identity
 deriving instance Show Kanji
+deriving instance Show KanjiId
 
+instance Table KanjiT where
+    data PrimaryKey KanjiT f = KanjiId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = KanjiId . _kanjiId
+
+type KanjiId = PrimaryKey KanjiT Identity
+
+instance Beamable KanjiT
+instance Beamable (PrimaryKey KanjiT)
 
 data VocabT f = Vocab {
     _vocabId             :: C f (Auto Int)
@@ -47,25 +56,59 @@ makeLenses ''VocabT
 
 type Vocab = VocabT Identity
 deriving instance Show Vocab
+deriving instance Show VocabId
 
--- VocabDB                       sql=VocabSet
---     Id                        sql=ID
---     kanjiWriting  Text Maybe  sql=KanjiWriting
---     kanaWriting   Text        sql=KanaWriting
---     isCommon      Bool        sql=IsCommon
---     freqRank      Int  Maybe  sql=FrequencyRank
---     furigana      Text Maybe  sql=Furigana
---     jlptLevel     Int  Maybe  sql=JlptLevel
---     wkLevel       Int  Maybe  sql=WkLevel
---     wikiRank      Int  Maybe  sql=WikiRank
---     groupId       Int         sql=GroupId
---     isMain        Bool        sql=IsMain
---     deriving Show
+instance Table VocabT where
+    data PrimaryKey VocabT f = VocabId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = VocabId . _vocabId
 
--- RadicalDB                     sql=RadicalSet
---     Id                        sql=ID
---     character     Text        sql=Character
---     deriving Show
+type VocabId = PrimaryKey VocabT Identity
+
+instance Beamable VocabT
+instance Beamable (PrimaryKey VocabT)
+
+data RadicalT f = Radical {
+    _radicalId             :: C f (Auto Int)
+  , _radicalCharacter      :: C f (Text)
+  }
+  deriving (Generic)
+
+makeLenses ''RadicalT
+
+type Radical = RadicalT Identity
+deriving instance Show Radical
+deriving instance Show RadicalId
+
+instance Table RadicalT where
+    data PrimaryKey RadicalT f = RadicalId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = RadicalId . _radicalId
+
+type RadicalId = PrimaryKey RadicalT Identity
+
+instance Beamable RadicalT
+instance Beamable (PrimaryKey RadicalT)
+
+data KanjiRadicalT f = KanjiRadical {
+    _kanjiRadicalKanji             :: (PrimaryKey KanjiT f)
+  , _kanjiRadicalRadical           :: (PrimaryKey RadicalT f)
+  }
+  deriving (Generic)
+
+makeLenses ''KanjiRadicalT
+
+type KanjiRadical = KanjiRadicalT Identity
+deriving instance Show KanjiRadical
+deriving instance Show KanjiRadicalId
+
+instance Table KanjiRadicalT where
+    data PrimaryKey KanjiRadicalT f =
+      KanjiRadicalId (PrimaryKey KanjiT f) (PrimaryKey RadicalT f) deriving Generic
+    primaryKey = KanjiRadicalId <$> _kanjiRadicalKanji <*> _kanjiRadicalRadical
+
+type KanjiRadicalId = PrimaryKey KanjiRadicalT Identity
+
+instance Beamable KanjiRadicalT
+instance Beamable (PrimaryKey KanjiRadicalT)
 
 -- KanjiRadicalDB                sql=KanjiRadical
 --     kanji         KanjiId     sql=Kanji_ID

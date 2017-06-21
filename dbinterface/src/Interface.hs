@@ -2,7 +2,6 @@ module Interface where
 
 import Model
 import DB
-import DBInstances
 
 import Protolude
 import Database.Beam

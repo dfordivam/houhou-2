@@ -1,7 +1,6 @@
 module DB where
 
 import Model
-import DBInstances
 
 import Protolude
 import Database.Beam
@@ -9,6 +8,8 @@ import Database.Beam
 data JMdictDb f = JMdictDb {
   _jmdictKanji :: f (TableEntity KanjiT)
   , _jmdictVocab :: f (TableEntity VocabT)
+  , _jmdictRadical :: f (TableEntity RadicalT)
+  , _jmdictKanjiRadical :: f (TableEntity KanjiRadicalT)
   }
   deriving (Generic)
 
@@ -47,5 +48,15 @@ jmdictDb = defaultDbSettings `withDbModification`
        , _vocabWikiRank       = fieldNamed "WikiRank"
        , _vocabGroupId        = fieldNamed "GroupId"
        , _vocabIsMain         = fieldNamed "IsMain"
+      }
+  , _jmdictRadical = modifyTable (\_ -> "RadicalSet") $ tableModification
+      {
+         _radicalId             = fieldNamed "ID"
+       , _radicalCharacter      = fieldNamed "Character"
+      }
+  , _jmdictKanjiRadical = modifyTable (\_ -> "KanjiRadical") $ tableModification
+      {
+         _kanjiRadicalKanji     = KanjiId $ fieldNamed "Kanji_ID"
+       , _kanjiRadicalRadical   = RadicalId $ fieldNamed "Radicals_ID"
       }
   }

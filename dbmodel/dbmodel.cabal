@@ -13,7 +13,6 @@ extra-source-files:  README.md
 
 library
   exposed-modules:     Model
-                       , DBInstances
                        , JSONInstances
   hs-source-dirs:      src
   main-is:             Main.hs

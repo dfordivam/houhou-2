@@ -1,7 +1,6 @@
 module JSONInstances where
 
 import Model
-import DBInstances
 
 import Protolude
 import Database.Beam
