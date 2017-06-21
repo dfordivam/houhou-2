@@ -6,6 +6,7 @@ import Protolude
 import Database.Beam
 import Control.Lens.TH
 
+----------------------------------------------------------------------
 data KanjiT f = Kanji {
     _kanjiId             :: C f (Auto Int)
   , _kanjiCharacter      :: C f (Text)
@@ -37,6 +38,7 @@ type KanjiId = PrimaryKey KanjiT Identity
 instance Beamable KanjiT
 instance Beamable (PrimaryKey KanjiT)
 
+----------------------------------------------------------------------
 data VocabT f = Vocab {
     _vocabId             :: C f (Auto Int)
   , _vocabKanjiWriting   :: C f (Maybe Text)
@@ -67,6 +69,7 @@ type VocabId = PrimaryKey VocabT Identity
 instance Beamable VocabT
 instance Beamable (PrimaryKey VocabT)
 
+----------------------------------------------------------------------
 data RadicalT f = Radical {
     _radicalId             :: C f (Auto Int)
   , _radicalCharacter      :: C f (Text)
@@ -88,6 +91,7 @@ type RadicalId = PrimaryKey RadicalT Identity
 instance Beamable RadicalT
 instance Beamable (PrimaryKey RadicalT)
 
+----------------------------------------------------------------------
 data KanjiRadicalT f = KanjiRadical {
     _kanjiRadicalKanji             :: (PrimaryKey KanjiT f)
   , _kanjiRadicalRadical           :: (PrimaryKey RadicalT f)
@@ -110,15 +114,56 @@ type KanjiRadicalId = PrimaryKey KanjiRadicalT Identity
 instance Beamable KanjiRadicalT
 instance Beamable (PrimaryKey KanjiRadicalT)
 
--- KanjiRadicalDB                sql=KanjiRadical
---     kanji         KanjiId     sql=Kanji_ID
---     radical       RadicalId   sql=Radicals_ID
---     Primary kanji radical
---     deriving Show
+----------------------------------------------------------------------
+-- TODO - Implement SVG
+data KanjiStrokesT f = KanjiStrokes {
+    _kanjiStrokesId             :: C f (Auto Int)
+  }
+  deriving (Generic)
+
+makeLenses ''KanjiStrokesT
+
+type KanjiStrokes = KanjiStrokesT Identity
+deriving instance Show KanjiStrokes
+deriving instance Show KanjiStrokesId
+
+instance Table KanjiStrokesT where
+    data PrimaryKey KanjiStrokesT f =
+      KanjiStrokesId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = KanjiStrokesId . _kanjiStrokesId
+
+type KanjiStrokesId = PrimaryKey KanjiStrokesT Identity
+
+instance Beamable KanjiStrokesT
+instance Beamable (PrimaryKey KanjiStrokesT)
 
 -- KanjiStrokesDB                sql=KanjiStrokes
 --     Id                        sql=ID
 --     framesSvg     ByteString  sql=FramesSvg
+
+----------------------------------------------------------------------
+data KanjiMeaningT f = KanjiMeaning {
+    _kanjiMeaningId         :: C f (Auto Int)
+  , _kanjiMeaningKanji      :: (PrimaryKey KanjiT f)
+  , _kanjiMeaningLanguage   :: C f (Maybe Text)
+  , _kanjiMeaningMeaning    :: C f (Text)
+  }
+  deriving (Generic)
+
+makeLenses ''KanjiMeaningT
+
+type KanjiMeaning = KanjiMeaningT Identity
+deriving instance Show KanjiMeaning
+deriving instance Show KanjiMeaningId
+
+instance Table KanjiMeaningT where
+    data PrimaryKey KanjiMeaningT f = KanjiMeaningId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = KanjiMeaningId . _kanjiMeaningId
+
+type KanjiMeaningId = PrimaryKey KanjiMeaningT Identity
+
+instance Beamable KanjiMeaningT
+instance Beamable (PrimaryKey KanjiMeaningT)
 
 -- KanjiMeaningDB                sql=KanjiMeaningSet
 --     Id                        sql=ID
@@ -127,35 +172,167 @@ instance Beamable (PrimaryKey KanjiRadicalT)
 --     meaning       Text        sql=Character
 --     deriving Show
 
+----------------------------------------------------------------------
+data VocabCategoryT f = VocabCategory {
+    _vocabCategoryId         :: C f (Auto Int)
+  , _vocabCategoryName       :: C f (Text)
+  , _vocabCategoryLabel      :: C f (Text)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabCategoryT
+
+type VocabCategory = VocabCategoryT Identity
+deriving instance Show VocabCategory
+deriving instance Show VocabCategoryId
+
+instance Table VocabCategoryT where
+    data PrimaryKey VocabCategoryT f = VocabCategoryId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = VocabCategoryId . _vocabCategoryId
+
+type VocabCategoryId = PrimaryKey VocabCategoryT Identity
+
+instance Beamable VocabCategoryT
+instance Beamable (PrimaryKey VocabCategoryT)
+
 -- VocabCategoryDB               sql=VocabCategorySet
 --     Id                        sql=ID
 --     name          Text        sql=ShortName
 --     label         Text        sql=Label
 --     deriving Show
 
+----------------------------------------------------------------------
+data VocabMeaningT f = VocabMeaning {
+    _vocabMeaningId         :: C f (Auto Int)
+  , _vocabMeaningMeaning    :: C f (Text)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabMeaningT
+
+type VocabMeaning = VocabMeaningT Identity
+deriving instance Show VocabMeaning
+deriving instance Show VocabMeaningId
+
+instance Table VocabMeaningT where
+    data PrimaryKey VocabMeaningT f = VocabMeaningId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = VocabMeaningId . _vocabMeaningId
+
+type VocabMeaningId = PrimaryKey VocabMeaningT Identity
+
+instance Beamable VocabMeaningT
+instance Beamable (PrimaryKey VocabMeaningT)
 -- VocabMeaningDB                sql=VocabMeaningSet
 --     Id                        sql=ID
 --     meaning       Text        sql=Meaning
 --     deriving Show
 
+----------------------------------------------------------------------
+data VocabVocabMeaningT f = VocabVocabMeaning {
+    _vocabVocabMeaningVocab             :: (PrimaryKey VocabT f)
+  , _vocabVocabMeaningMeaning           :: (PrimaryKey VocabMeaningT f)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabVocabMeaningT
+
+type VocabVocabMeaning = VocabVocabMeaningT Identity
+deriving instance Show VocabVocabMeaning
+deriving instance Show VocabVocabMeaningId
+
+instance Table VocabVocabMeaningT where
+    data PrimaryKey VocabVocabMeaningT f =
+      VocabVocabMeaningId (PrimaryKey VocabT f) (PrimaryKey VocabMeaningT f) deriving Generic
+    primaryKey = VocabVocabMeaningId <$> _vocabVocabMeaningVocab <*> _vocabVocabMeaningMeaning
+
+type VocabVocabMeaningId = PrimaryKey VocabVocabMeaningT Identity
+
+instance Beamable VocabVocabMeaningT
+instance Beamable (PrimaryKey VocabVocabMeaningT)
 -- VocabEntityVocabMeaningDB     sql=VocabEntityVocabMeaning
 --     vocab         VocabId     sql=VocabEntity_ID
 --     meaning    VocabMeaningId sql=Meanings_ID
 --     Primary vocab meaning
 --     deriving Show
 
+----------------------------------------------------------------------
+data VocabMeaningVocabCategoryT f = VocabMeaningVocabCategory {
+    _vocabMeaningVocabCategoryMeaning           :: (PrimaryKey VocabMeaningT f)
+  , _vocabMeaningVocabCategoryCategory          :: (PrimaryKey VocabCategoryT f)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabMeaningVocabCategoryT
+
+type VocabMeaningVocabCategory = VocabMeaningVocabCategoryT Identity
+deriving instance Show VocabMeaningVocabCategory
+deriving instance Show VocabMeaningVocabCategoryId
+
+instance Table VocabMeaningVocabCategoryT where
+    data PrimaryKey VocabMeaningVocabCategoryT f =
+      VocabMeaningVocabCategoryId (PrimaryKey VocabMeaningT f) (PrimaryKey VocabCategoryT f) deriving Generic
+    primaryKey = VocabMeaningVocabCategoryId <$> _vocabMeaningVocabCategoryMeaning <*> _vocabMeaningVocabCategoryCategory
+
+type VocabMeaningVocabCategoryId = PrimaryKey VocabMeaningVocabCategoryT Identity
+
+instance Beamable VocabMeaningVocabCategoryT
+instance Beamable (PrimaryKey VocabMeaningVocabCategoryT)
 -- VocabMeaningVocabCategoryDB   sql=VocabMeaningVocabCategory
 --     meaning   VocabMeaningId  sql=VocabMeaningVocabCategory_VocabCategory_ID
 --     category  VocabCategoryId sql=Categories_ID
 --     Primary meaning category
 --     deriving Show
 
+----------------------------------------------------------------------
+data VocabVocabCategoryT f = VocabVocabCategory {
+    _vocabVocabCategoryVocab             :: (PrimaryKey VocabT f)
+  , _vocabVocabCategoryCategory          :: (PrimaryKey VocabCategoryT f)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabVocabCategoryT
+
+type VocabVocabCategory = VocabVocabCategoryT Identity
+deriving instance Show VocabVocabCategory
+deriving instance Show VocabVocabCategoryId
+
+instance Table VocabVocabCategoryT where
+    data PrimaryKey VocabVocabCategoryT f =
+      VocabVocabCategoryId (PrimaryKey VocabT f) (PrimaryKey VocabCategoryT f) deriving Generic
+    primaryKey = VocabVocabCategoryId <$> _vocabVocabCategoryVocab <*> _vocabVocabCategoryCategory
+
+type VocabVocabCategoryId = PrimaryKey VocabVocabCategoryT Identity
+
+instance Beamable VocabVocabCategoryT
+instance Beamable (PrimaryKey VocabVocabCategoryT)
 -- VocabCategoryVocabEntityDB    sql=VocabCategoryVocabEntity
 --     vocab     VocabId         sql=VocabCategoryVocabEntity_VocabCategory_ID
 --     category  VocabCategoryId sql=Categories_ID
 --     Primary category vocab
 --     deriving Show
 
+----------------------------------------------------------------------
+data VocabKanjiT f = VocabKanji {
+    _vocabKanjiVocab             :: (PrimaryKey VocabT f)
+  , _vocabKanjiKanji             :: (PrimaryKey KanjiT f)
+  }
+  deriving (Generic)
+
+makeLenses ''VocabKanjiT
+
+type VocabKanji = VocabKanjiT Identity
+deriving instance Show VocabKanji
+deriving instance Show VocabKanjiId
+
+instance Table VocabKanjiT where
+    data PrimaryKey VocabKanjiT f =
+      VocabKanjiId (PrimaryKey VocabT f) (PrimaryKey KanjiT f) deriving Generic
+    primaryKey = VocabKanjiId <$> _vocabKanjiVocab <*> _vocabKanjiKanji
+
+type VocabKanjiId = PrimaryKey VocabKanjiT Identity
+
+instance Beamable VocabKanjiT
+instance Beamable (PrimaryKey VocabKanjiT)
 -- KanjiEntityVocabEntityDB      sql=KanjiEntityVocabEntity
 --     vocab         VocabId     sql=Vocabs_ID
 --     kanji         KanjiId     sql=Kanji_ID

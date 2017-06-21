@@ -1,17 +1,30 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module DB where
 
 import Model
 
 import Protolude
 import Database.Beam
+import Control.Lens.TH
 
 data JMdictDb f = JMdictDb {
   _jmdictKanji :: f (TableEntity KanjiT)
   , _jmdictVocab :: f (TableEntity VocabT)
   , _jmdictRadical :: f (TableEntity RadicalT)
   , _jmdictKanjiRadical :: f (TableEntity KanjiRadicalT)
+  , _jmdictKanjiStrokes :: f (TableEntity KanjiStrokesT)
+  , _jmdictKanjiMeaning :: f (TableEntity KanjiMeaningT)
+  , _jmdictVocabCategory :: f (TableEntity VocabCategoryT)
+  , _jmdictVocabMeaning :: f (TableEntity VocabMeaningT)
+  , _jmdictVocabVocabMeaning :: f (TableEntity VocabVocabMeaningT)
+  , _jmdictVocabMeaningVocabCategory :: f (TableEntity VocabMeaningVocabCategoryT)
+  , _jmdictVocabVocabCategory :: f (TableEntity VocabVocabCategoryT)
+  , _jmdictVocabKanji :: f (TableEntity VocabKanjiT)
   }
   deriving (Generic)
+
+makeLenses ''JMdictDb
 
 instance Database JMdictDb
 
@@ -58,5 +71,47 @@ jmdictDb = defaultDbSettings `withDbModification`
       {
          _kanjiRadicalKanji     = KanjiId $ fieldNamed "Kanji_ID"
        , _kanjiRadicalRadical   = RadicalId $ fieldNamed "Radicals_ID"
+      }
+  , _jmdictKanjiStrokes = modifyTable (\_ -> "KanjiStrokes") $ tableModification
+      {
+         _kanjiStrokesId = fieldNamed "ID"
+      }
+  , _jmdictKanjiMeaning = modifyTable (\_ -> "KanjiMeaningSet") $ tableModification
+      {
+         _kanjiMeaningId = fieldNamed "ID"
+       , _kanjiMeaningKanji = KanjiId $ fieldNamed "Kanji_ID"
+       , _kanjiMeaningLanguage = fieldNamed "Language"
+       , _kanjiMeaningMeaning = fieldNamed "Character"
+      }
+  , _jmdictVocabCategory = modifyTable (\_ -> "VocabCategorySet") $ tableModification
+      {
+         _vocabCategoryId = fieldNamed "ID"
+       , _vocabCategoryName = fieldNamed "ShortName"
+       , _vocabCategoryLabel = fieldNamed "Label"
+      }
+  , _jmdictVocabMeaning = modifyTable (\_ -> "VocabMeaningSet") $ tableModification
+      {
+         _vocabMeaningId  = fieldNamed "ID"
+       , _vocabMeaningMeaning = fieldNamed "Meaning"
+      }
+  , _jmdictVocabVocabMeaning = modifyTable (\_ -> "VocabEntityVocabMeaning") $ tableModification
+      {
+         _vocabVocabMeaningVocab   = VocabId $ fieldNamed "VocabEntity_ID"
+       , _vocabVocabMeaningMeaning = VocabMeaningId $ fieldNamed "Meanings_ID"
+      }
+  , _jmdictVocabMeaningVocabCategory = modifyTable (\_ -> "VocabMeaningVocabCategory") $ tableModification
+      {
+         _vocabMeaningVocabCategoryMeaning   = VocabMeaningId $ fieldNamed "VocabMeaningVocabCategory_VocabCategory_ID"
+       ,  _vocabMeaningVocabCategoryCategory = VocabCategoryId $ fieldNamed "Categories_ID"
+      }
+  , _jmdictVocabVocabCategory = modifyTable (\_ -> "VocabCategoryVocabEntity") $ tableModification
+      {
+         _vocabVocabCategoryVocab   = VocabId $ fieldNamed "VocabCategoryVocabEntity_VocabCategory_ID"
+       , _vocabVocabCategoryCategory = VocabCategoryId $ fieldNamed "Categories_ID"
+      }
+  , _jmdictVocabKanji = modifyTable (\_ -> "KanjiEntityVocabEntity") $ tableModification
+      {
+         _vocabKanjiVocab  = VocabId $ fieldNamed "Vocabs_ID"
+       , _vocabKanjiKanji  = KanjiId $ fieldNamed "Kanji_ID"
       }
   }
