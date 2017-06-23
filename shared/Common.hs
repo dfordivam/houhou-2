@@ -53,13 +53,6 @@ radicalTable = Map.fromList $
   ,(RadicalId 2, RadicalDetails "b")
   ,(RadicalId 3, RadicalDetails "c")]
 
-data KanjiFilter = KanjiFilter
-  { textContent :: Text
-  , filter :: (Text, FilterOptions)
-  , selectedRadicals :: [RadicalId]
-  }
-  deriving (Generic, Show)
-
 data FilterOptions = OnYomi | KonYumi | Nanori
   deriving (Generic, Show)
 

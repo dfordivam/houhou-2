@@ -2,26 +2,41 @@ module Message
   where
 
 import Common
-import ClassyPrelude
+import Protolude
 import Data.Aeson
 
 -- Messages
 
+type AppRequest =
+  KanjiFilter
+  :<|> GetKanjiDetails
+  -- :<|>
 
--- data ClientReq
---   = DoKanjiFilter KanjiFilter
---   | GetKanjiDetails KanjiId
---   deriving (Generic, Show)
+data KanjiFilter = KanjiFilter
+  { textContent :: Text
+  , filter :: (Text, FilterOptions)
+  , selectedRadicals :: [RadicalId]
+  }
+  deriving (Generic, Show)
 
 data KanjiFilterResult =
   KanjiFilterResult KanjiList --
                     [RadicalId] -- Valid Radicals
   deriving (Generic, Show)
 
+instance WebSocketMessage AppRequest KanjiFilter where
+  type ResponseT AppRequest KanjiFilter = KanjiFilterResult
+
+data GetKanjiDetails =
+  GetKanjiDetails KanjiId
+
 data KanjiSelectionDetails =
   KanjiSelectionDetails KanjiDetails
                         VocabDisplay
   deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest GetKanjiDetails where
+  type ResponseT AppRequest GetKanjiDetails = KanjiSelectionDetails
 
 instance ToJSON KanjiSelectionDetails where
   toEncoding = genericToEncoding defaultOptions
