@@ -28,6 +28,8 @@ makeLenses ''KanjiT
 type Kanji = KanjiT Identity
 deriving instance Show Kanji
 deriving instance Show KanjiId
+deriving instance Ord KanjiId
+deriving instance Eq KanjiId
 
 instance Table KanjiT where
     data PrimaryKey KanjiT f = KanjiId (Columnar f (Auto Int)) deriving Generic

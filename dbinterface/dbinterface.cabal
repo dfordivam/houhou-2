@@ -34,3 +34,4 @@ library
                      , beam-sqlite
                      , lens
                      , dbmodel
+                     , containers
