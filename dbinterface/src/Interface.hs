@@ -30,7 +30,7 @@ searchKanji inp = do
   ks <- forM inp (\i -> (selectListQuery $ query i))
   return $ concat ks
   where
-    query i = do
+    query i =
       filter_ (\k -> (k ^. kanjiCharacter) ==. val_ i) $
         (all_ (_jmdictKanji jmdictDb))
 
@@ -91,9 +91,21 @@ filterKanjiByRadical (r1:rs) ks = do
     --                 (all_ (_jmdictKanjiRadical jmdictDb)))
     --   selectListQuery query
 
--- getKanjiMeaning :: [KanjiId] -> DBMonad [Meaning]
--- getKanjiMeaning
+getKanjiMeaning :: KanjiId -> DBMonad (Maybe KanjiMeaning)
+getKanjiMeaning kId =
+  headMay <$> selectListQuery query
+  where
+    query = limit_ 1 $
+      filter_ (\k -> (k ^. kanjiMeaningKanji) ==. val_ kId) $
+        (all_ (_jmdictKanjiMeaning jmdictDb))
 
--- getMostUsedKanjis :: DBMonad ([Kanji])
-
--- getKanjiByRadical :: [RadicalId] -> DBMonad [Kanji]
+getMostUsedKanjis :: DBMonad ([Kanji])
+getMostUsedKanjis =
+  getKanji =<< selectListQuery query
+  where
+    getKanji ks = return $ sortBy f ks
+    f i1 i2 = g (i1 ^. kanjiMostUsedRank) (i2 ^. kanjiMostUsedRank)
+    g (Just r1) (Just r2) = compare r1 r2
+    query =
+      filter_ (isJust_ . _kanjiMostUsedRank)$
+        (all_ (_jmdictKanji jmdictDb))
