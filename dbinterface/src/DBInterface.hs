@@ -1,6 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-module DBInterface where
+module DBInterface
+  ( openDB
+  , DBMonad
+  , primaryKey
+  , searchKanji
+  , searchKanjiByReading
+  , filterKanjiByRadical
+  , getMostUsedKanjis
+  , getKanjiMeaning
+  , getValidRadicalList
+  , getKanji
+  ) where
 
 import Model
 import DB
@@ -109,3 +120,22 @@ getMostUsedKanjis =
     query =
       filter_ (isJust_ . _kanjiMostUsedRank)$
         (all_ (_jmdictKanji jmdictDb))
+
+getValidRadicalList :: [KanjiId] -> DBMonad [RadicalId]
+getValidRadicalList ks = do
+  let
+      query k = map _kanjiRadicalRadical $
+              filter_ (\r -> r ^. kanjiRadicalKanji ==. val_ k)
+                (all_ (_jmdictKanjiRadical jmdictDb))
+  rs <- forM ks (\k -> selectListQuery (query k))
+  return $ (ordNub . concat) rs
+
+
+getKanji :: [KanjiId] -> DBMonad [Kanji]
+getKanji ks = do
+  conn <- ask
+  let query k = lookup (_jmdictKanji jmdictDb) k
+      fun k = liftIO $
+        withDatabaseDebug putStrLn conn $ runSelectReturningOne (query k)
+  rs <- forM ks fun
+  return $ catMaybes rs

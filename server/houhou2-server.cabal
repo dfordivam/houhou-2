@@ -14,12 +14,22 @@ cabal-version:       >=1.10
 
 executable houhou2-server
   main-is:             Main.hs
-  -- other-modules:
+  other-modules:       Handlers
+                       AppWebsocket
   -- other-extensions:
   default-extensions:  NoImplicitPrelude
   build-depends:       base >=4.9 && <4.10
                      , protolude
                      , wai-websockets
                      , aeson
+                     , dbinterface
+                     , dbmodel
+                     , lens
+                     , text
+                     , mtl
+                     , sqlite-simple
+                     , houhou2-shared
+                     , reflex-websocket-interface-shared
+                     , reflex-websocket-interface-server
   hs-source-dirs:      src
   default-language:    Haskell2010

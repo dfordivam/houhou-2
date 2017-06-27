@@ -1,12 +1,12 @@
-{ mkDerivation, aeson, base, classy-prelude, containers, stdenv
-, text
+{ mkDerivation, aeson, base, containers, protolude
+, reflex-websocket-interface-shared, stdenv
 }:
 mkDerivation {
   pname = "houhou2-shared";
   version = "0.1.0.0";
   src = ./.;
   libraryHaskellDepends = [
-    aeson base classy-prelude containers text
+    aeson base containers protolude reflex-websocket-interface-shared
   ];
   license = stdenv.lib.licenses.bsd3;
 }

@@ -1,8 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Handlers where
 
-import Protolude
-import Control.Lens.TH
+import Protolude hiding ((&))
+import Control.Lens
+import qualified Model as DB
+import Control.Monad.RWS
+import Database.SQLite.Simple
+import Message
+import Common
+import DBInterface
+import Utils
+import qualified Data.Text as T
 
 type Handler = RWST Connection () HandlerState IO
 
@@ -14,14 +23,14 @@ makeLenses ''HandlerState
 
 runDB :: (DBMonad a) -> Handler a
 runDB f = do
-  conn <- asks
-  let res = runReaderT f conn
+  conn <- ask
+  res <- liftIO $ runReaderT f conn
   return res
 
 -- Pagination,
 getKanjiFilterResult :: KanjiFilter -> Handler KanjiFilterResult
 getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
-  let uniqKanji = uniq $ sort $ getKanji inpTxt
+  let uniqKanji = ordNub $ getKanjis inpTxt
 
   -- inpTxt in empty
   -- but filt and rads are non empty
@@ -33,49 +42,58 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
   -- 3. Radicals
   let
     fun
-      | (null inpTxt) && (null filtTxt)
-        && (null rads) ->
-          liftIO $ getMostUsedKanjis
-      | (null inpTxt) && (null filtTxt) ->
-          liftIO $ getKanjiByRadical $ coerce rads
-      | (null inpTxt) && (null rads) ->
+      | (T.null inpTxt) && (T.null filtTxt)
+        && (null rads) =
+        getMostUsedKanjis
+
+      | (T.null inpTxt) && (T.null filtTxt) =
+        getKanji =<<
+          filterKanjiByRadical (DB.makeKeys rads) []
+
+      | (T.null inpTxt) && (null rads) =
         searchKanjiByReading uniqKanji on ku na
-      | (null filtTxt) && (null rads) ->
+
+      | (T.null filtTxt) && (null rads) =
         searchKanji uniqKanji
-      | (null rads)
+
+      | (null rads) =
         searchKanjiByReading uniqKanji on ku na
-      | (null filtTxt)
+
+      | (T.null filtTxt) = do
         ks <- searchKanji uniqKanji
-        filterKanjiByRadical rads ks
-      | otherwise -> runDB $
-        --  | (null inpTxt)
+        getKanji =<<
+          filterKanjiByRadical (DB.makeKeys rads)
+            (map primaryKey ks)
+
+      | otherwise = do
+        --  | (T.null inpTxt)
         ks <- searchKanjiByReading uniqKanji on ku na
-        filterKanjiByRadical rads ks
+        getKanji =<<
+          filterKanjiByRadical (DB.makeKeys rads)
+            (map primaryKey ks)
 
     (on,ku,na) = case filtType of
-      OnYomiT -> (filtTxt,"","")
-      KunYomiT -> ("",filtTxt,"")
-      NanoriT -> ("","",filtTxt)
+      OnYomi -> (filtTxt,"","")
+      KonYumi -> ("",filtTxt,"")
+      Nanori -> ("","",filtTxt)
 
-
-
-  kanjiList <- fun
-
-
-  validRadicals <- runDB $ getValidRadicalList kanjiList
-
-
+  kanjiList <- runDB fun
+  validRadicals <- runDB $ getValidRadicalList $
+    map primaryKey kanjiList
+  let
+      kanjiResultCount = 20
   state
-    (\s ->((), s ^. kanjiSearchResult ~ kanjiList
-          & kanjiDisplayCount ~ kanjiResultCount))
+    (\s ->((), s & kanjiSearchResult .~ kanjiList
+          & kanjiDisplayCount .~ kanjiResultCount))
 
-  let displayKanjiList = take kanjiResultCount kanjiList
+  let displayKanjiList =
+        take kanjiResultCount kanjiList
 
-  meanings <- runDB $ getKanjiMeaning displayKanjiList
+  meanings <- runDB $ mapM getKanjiMeaning $
+        fmap primaryKey $ displayKanjiList
   let l = map convertKanji $ zip displayKanjiList meanings
       convertKanji
-        :: (DB.Kanji, DB.Meaning)
+        :: (DB.Kanji, Maybe DB.KanjiMeaning)
         -> (KanjiId, KanjiT, RankT, MeaningT)
-      convertKanji (k,m) =
-      r = map RadicalId validRadicals
-  return $ KanjiFilterResult l r
+      convertKanji (k,m) = undefined
+  return $ KanjiFilterResult l (DB.getKeys validRadicals)

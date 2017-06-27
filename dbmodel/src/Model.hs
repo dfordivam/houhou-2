@@ -1,10 +1,22 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Model where
 
 import Protolude
 import Database.Beam
 import Control.Lens.TH
+import Data.Coerce
+
+class UniqKey k where
+  getKey :: (Coercible Int t) => k -> Maybe t
+  makeKey :: (Coercible Int t) => Maybe t -> k
+
+getKeys :: (UniqKey k, Coercible Int t) => [k] -> [t]
+getKeys ks = catMaybes (map  getKey ks)
+
+makeKeys :: (UniqKey k, Coercible Int t) => [t] -> [k]
+makeKeys = map (makeKey . Just)
 
 ----------------------------------------------------------------------
 data KanjiT f = Kanji {
@@ -37,6 +49,10 @@ instance Table KanjiT where
 
 type KanjiId = PrimaryKey KanjiT Identity
 
+instance UniqKey KanjiId where
+  getKey (KanjiId k) = coerce k
+  makeKey t = KanjiId (coerce t)
+
 instance Beamable KanjiT
 instance Beamable (PrimaryKey KanjiT)
 
@@ -68,6 +84,10 @@ instance Table VocabT where
 
 type VocabId = PrimaryKey VocabT Identity
 
+instance UniqKey VocabId where
+  getKey (VocabId k) = coerce k
+  makeKey t = VocabId (coerce t)
+
 instance Beamable VocabT
 instance Beamable (PrimaryKey VocabT)
 
@@ -83,12 +103,18 @@ makeLenses ''RadicalT
 type Radical = RadicalT Identity
 deriving instance Show Radical
 deriving instance Show RadicalId
+deriving instance Eq RadicalId
+deriving instance Ord RadicalId
 
 instance Table RadicalT where
     data PrimaryKey RadicalT f = RadicalId (Columnar f (Auto Int)) deriving Generic
     primaryKey = RadicalId . _radicalId
 
 type RadicalId = PrimaryKey RadicalT Identity
+
+instance UniqKey RadicalId where
+  getKey (RadicalId k) = coerce k
+  makeKey t = RadicalId (coerce t)
 
 instance Beamable RadicalT
 instance Beamable (PrimaryKey RadicalT)

@@ -1,10 +1,11 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Common
   where
 
-import ClassyPrelude
+import Protolude
 -- import GHC.Generics
 import Data.Aeson
 import qualified Data.Map as Map
@@ -42,7 +43,7 @@ newtype KanjiId = KanjiId { unKanjiId :: Int }
 -- Kanji Widget related data
 
 data RadicalDetails =
-  RadicalDetails String
+  RadicalDetails Text
   deriving (Generic, Show)
 
 type RadicalTable = Map RadicalId RadicalDetails

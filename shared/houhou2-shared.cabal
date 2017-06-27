@@ -21,6 +21,8 @@ library
   default-extensions:  DeriveGeneric, NoImplicitPrelude
   build-depends:       base,
                        aeson,
+                       containers,
+                       reflex-websocket-interface-shared,
                        protolude
   -- hs-source-dirs:
   default-language:    Haskell2010
