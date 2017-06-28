@@ -81,7 +81,7 @@ jmdictDb = defaultDbSettings `withDbModification`
          _kanjiMeaningId = fieldNamed "ID"
        , _kanjiMeaningKanji = KanjiId $ fieldNamed "Kanji_ID"
        , _kanjiMeaningLanguage = fieldNamed "Language"
-       , _kanjiMeaningMeaning = fieldNamed "Character"
+       , _kanjiMeaningMeaning = fieldNamed "Meaning"
       }
   , _jmdictVocabCategory = modifyTable (\_ -> "VocabCategorySet") $ tableModification
       {

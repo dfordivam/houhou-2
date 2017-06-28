@@ -77,9 +77,14 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
       KonYumi -> ("",filtTxt,"")
       Nanori -> ("","",filtTxt)
 
+    getRadicals kanjiList
+      | (T.null inpTxt) && (T.null filtTxt)
+        && (null rads) = return []
+      | otherwise =
+        getValidRadicalList $ map primaryKey kanjiList
+
   kanjiList <- runDB fun
-  validRadicals <- runDB $ getValidRadicalList $
-    map primaryKey kanjiList
+  validRadicals <- runDB (getRadicals kanjiList)
   let
       kanjiResultCount = 20
   state
@@ -88,12 +93,21 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
 
   let displayKanjiList =
         take kanjiResultCount kanjiList
-
-  meanings <- runDB $ mapM getKanjiMeaning $
+      displayKanjiListKeys =
         fmap primaryKey $ displayKanjiList
-  let l = map convertKanji $ zip displayKanjiList meanings
+      displayKanjiListKIds = DB.getKeys displayKanjiListKeys
+
+  meanings <- runDB $
+    mapM getKanjiMeaning $ displayKanjiListKeys
+
+  let l = map convertKanji $
+            zip displayKanjiListKIds $
+            zip displayKanjiList meanings
       convertKanji
-        :: (DB.Kanji, Maybe DB.KanjiMeaning)
-        -> (KanjiId, KanjiT, RankT, MeaningT)
-      convertKanji (k,m) = undefined
+        :: (KanjiId, (DB.Kanji, Maybe DB.KanjiMeaning))
+        -> (KanjiId, KanjiT, Maybe RankT, Maybe MeaningT)
+      convertKanji (i,(k,m)) =
+        (i, KanjiT $ k ^. DB.kanjiCharacter
+        , RankT <$> (k ^. DB.kanjiMostUsedRank)
+        , MeaningT <$> (DB._kanjiMeaningMeaning <$> m))
   return $ KanjiFilterResult l (DB.getKeys validRadicals)

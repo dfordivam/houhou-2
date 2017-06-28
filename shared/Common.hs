@@ -14,27 +14,27 @@ import qualified Data.Map as Map
 
 -- New Types
 newtype KanjiT = KanjiT { unKanjiT :: Text }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype RankT = RankT { unRankT :: Int }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype MeaningT = MeaningT { unMeaningT :: Text }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype GradeT = GradeT { unGradeT :: Int }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype StrokeCountT = StrokeCountT { unStrokeCountT :: Int }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype MostUsedRankT = MostUsedRankT { unMostUsedRankT :: Int }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype JlptLevelT = JlptLevelT { unJlptLevelT :: Int }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype WkLevelT = WkLevelT { unWkLevelT :: Int }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype OnYomiT = OnYomiT { unOnYomiT :: Text }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype KunYomiT = KunYomiT { unKunYomiT :: Text }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype NanoriT = NanoriT { unNanoriT :: Text }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 newtype RadicalId = RadicalId { unRadicalId :: Int }
   deriving (Generic, Show, Eq, Ord)
 newtype KanjiId = KanjiId { unKanjiId :: Int }
@@ -44,7 +44,7 @@ newtype KanjiId = KanjiId { unKanjiId :: Int }
 
 data RadicalDetails =
   RadicalDetails Text
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 type RadicalTable = Map RadicalId RadicalDetails
 
@@ -55,10 +55,10 @@ radicalTable = Map.fromList $
   ,(RadicalId 3, RadicalDetails "c")]
 
 data FilterOptions = OnYomi | KonYumi | Nanori
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 type KanjiList =
-   [(KanjiId, KanjiT, RankT, MeaningT)]
+   [(KanjiId, KanjiT, Maybe RankT, Maybe MeaningT)]
 
 data KanjiDetails =
   KanjiDetails KanjiT
@@ -71,17 +71,17 @@ data KanjiDetails =
                OnYomiT
                KunYomiT
                NanoriT
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 
 data VocabDisplay = VocabDisplay
   { vocabDispFilter :: (Text, Text, Bool, Bool)
   , vocabList :: [VocabDispItem]
   }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 data VocabDispItem = VocabDispItem
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 -- Instance declarations
 instance ToJSON KanjiT where

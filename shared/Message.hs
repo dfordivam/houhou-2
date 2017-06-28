@@ -35,7 +35,7 @@ data KanjiFilter = KanjiFilter
 data KanjiFilterResult =
   KanjiFilterResult KanjiList --
                     [RadicalId] -- Valid Radicals
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 instance WebSocketMessage AppRequest KanjiFilter where
   type ResponseT AppRequest KanjiFilter = KanjiFilterResult
@@ -47,7 +47,7 @@ data GetKanjiDetails =
 data KanjiSelectionDetails =
   KanjiSelectionDetails KanjiDetails
                         VocabDisplay
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 
 instance WebSocketMessage AppRequest GetKanjiDetails where
   type ResponseT AppRequest GetKanjiDetails = KanjiSelectionDetails

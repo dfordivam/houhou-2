@@ -14,9 +14,18 @@ cabal-version:       >=1.10
 
 executable houhou2-server
   main-is:             Main.hs
-  other-modules:       Handlers
-                       AppWebsocket
   -- other-extensions:
+  build-depends:       base >=4.9 && <4.10
+                     , houhou2-server
+  hs-source-dirs:      app
+  default-language:    Haskell2010
+
+library
+  exposed-modules:     Handlers
+                       AppWebsocket
+  other-modules:       Utils
+  hs-source-dirs:      src
+  default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
   build-depends:       base >=4.9 && <4.10
                      , protolude
@@ -31,5 +40,15 @@ executable houhou2-server
                      , houhou2-shared
                      , reflex-websocket-interface-shared
                      , reflex-websocket-interface-server
-  hs-source-dirs:      src
-  default-language:    Haskell2010
+
+test-suite unit
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules: HandlerTests
+  build-depends: base, text, bytestring, time, tasty, tasty-hunit
+               , houhou2-server, dbinterface, houhou2-shared, mtl
+  default-language: Haskell2010
+  default-extensions: OverloadedStrings, FlexibleInstances, FlexibleContexts, GADTs, TypeFamilies,
+                      DeriveGeneric, DefaultSignatures, RankNTypes, StandaloneDeriving, KindSignatures,
+                      TypeApplications, ScopedTypeVariables, MultiParamTypeClasses
