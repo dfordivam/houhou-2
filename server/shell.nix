@@ -6,6 +6,7 @@ let
 
   inherit (nixpkgs) pkgs;
 
+  pretty-simple = ghc.callPackage ~/repos/pretty-simple        {};
   beam-core = ghc.callPackage ~/repos/beam/beam-core        {};
   beam-migrate = ghc.callPackage ~/repos/beam/beam-migrate {inherit beam-core;};
   beam-sqlite = ghc.callPackage ~/repos/beam/beam-sqlite {inherit beam-core beam-migrate;};
@@ -18,7 +19,7 @@ let
   reflex-websocket-interface-server = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/typeclassbased/server {inherit reflex-websocket-interface-shared;};
 
   drv = ghc.callPackage ./default.nix {
-    inherit dbmodel dbinterface houhou2-shared reflex-websocket-interface-shared reflex-websocket-interface-server;
+    inherit dbmodel dbinterface houhou2-shared reflex-websocket-interface-shared reflex-websocket-interface-server pretty-simple;
     };
 
 in

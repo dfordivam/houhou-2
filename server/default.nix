@@ -1,5 +1,5 @@
 { mkDerivation, aeson, base, bytestring, dbinterface, dbmodel
-, houhou2-shared, lens, mtl, protolude
+, houhou2-shared, lens, mtl, pretty-simple, protolude
 , reflex-websocket-interface-server
 , reflex-websocket-interface-shared, sqlite-simple, stdenv, tasty
 , tasty-hunit, text, time, wai-websockets
@@ -17,7 +17,8 @@ mkDerivation {
   ];
   executableHaskellDepends = [ base ];
   testHaskellDepends = [
-    base bytestring tasty tasty-hunit text time
+    base bytestring dbinterface houhou2-shared mtl pretty-simple
+    sqlite-simple tasty tasty-hunit text time
   ];
   license = stdenv.lib.licenses.bsd3;
 }

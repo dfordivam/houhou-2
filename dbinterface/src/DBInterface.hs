@@ -2,6 +2,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module DBInterface
   ( openDB
+  , close
   , DBMonad
   , primaryKey
   , searchKanji
@@ -34,7 +35,8 @@ type DBMonad = ReaderT Connection IO
 selectListQuery query = do
   conn <- ask
   liftIO $
-    withDatabaseDebug putStrLn conn (runSelectReturningList $ select $ query)
+    withDatabase conn (runSelectReturningList $ select $ query)
+    -- withDatabaseDebug putStrLn conn (runSelectReturningList $ select $ query)
 
 searchKanji :: [Text] -> DBMonad [Kanji]
 searchKanji inp = do
@@ -51,27 +53,33 @@ searchKanjiByReading
   -> Text
   -> Text
   -> DBMonad [Kanji]
-searchKanjiByReading [] on ku na = selectListQuery query
+searchKanjiByReading [] on ku na = do
+  ks <- selectListQuery query
+  liftIO $ print ks
+  return ks
   where
+    likeMaybe_ f v = maybe_ (val_ False) ((flip like_) (val_ (v <> "%"))) f
     query =
       filter_
         (\k ->
-           (((k ^. kanjiOnyomi) ==. (just_ (val_ on))) ||.
-            ((k ^. kanjiKunyomi) ==. (just_ (val_ ku))) ||.
-            ((k ^. kanjiNanori) ==. (just_ (val_ na))))) $
+            (((k ^. kanjiKunyomi) `likeMaybe_` ku) ||.
+            ((k ^. kanjiOnyomi) `likeMaybe_` on) ||.
+            ((k ^. kanjiNanori) `likeMaybe_` na))) $
       (all_ (_jmdictKanji jmdictDb))
 
 searchKanjiByReading inp on ku na = do
   ks <- forM inp (\i -> (selectListQuery $ query i))
+  liftIO $ print ks
   return $ concat ks
   where
+    likeMaybe_ f v = maybe_ (val_ False) ((flip like_) (val_ (v <> "%"))) f
     query i =
       filter_
         (\k ->
            ((k ^. kanjiCharacter) ==. val_ i) &&.
-           (((k ^. kanjiOnyomi) ==. (just_ (val_ on))) ||.
-            ((k ^. kanjiKunyomi) ==. (just_ (val_ ku))) ||.
-            ((k ^. kanjiNanori) ==. (just_ (val_ na))))) $
+            (((k ^. kanjiKunyomi) `likeMaybe_` ku) ||.
+            ((k ^. kanjiOnyomi) `likeMaybe_` on) ||.
+            ((k ^. kanjiNanori) `likeMaybe_` na))) $
       (all_ (_jmdictKanji jmdictDb))
 
 filterKanjiByRadical :: [RadicalId] -> [KanjiId] -> DBMonad [KanjiId]

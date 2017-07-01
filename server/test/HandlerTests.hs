@@ -2,38 +2,99 @@ module HandlerTests where
 
 import Test.Tasty
 import Test.Tasty.HUnit
+import Text.Pretty.Simple
 
 import Handlers
 import Message
 import Common
-import DBInterface
 import Control.Monad.RWS
+import Database.SQLite.Simple
 
-tests :: TestTree
-tests = testGroup "Handler Tests"
-                  [ kanjiFilterTest]
+tests :: (IO Connection) -> TestTree
+tests getConn = testGroup "Handler Tests"
+                  [kanjiFilterTest getConn]
 
-runHandler :: Handler a -> IO a
-runHandler h = do
+runHandler :: (IO Connection) -> Handler a -> IO a
+runHandler getConn h = do
   let initState = HandlerState [] 20
-  conn <- openDB
+  conn <- getConn
   (a, s, w) <- runRWST h conn initState
   return a
 
-kanjiFilterTest :: TestTree
-kanjiFilterTest = testGroup "Kanji Filter"
-  [testCase "Check" $
-    True @=? True
-  , testCase "2" $
-    do
-      let req = KanjiFilter "" ("", OnYomi) []
-          exp = KanjiFilterResult [] []
-          chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
+kanjiFilterTest :: (IO Connection) -> TestTree
+kanjiFilterTest getConn =
+  let runH = runHandler getConn
+  in testGroup "Kanji Filter"
+  [testCase "Empty Filter Query" $ do
+     let req = KanjiFilter "" ("", OnYomi) []
+         chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
 
-      (KanjiFilterResult resp rads) <- runHandler $ getKanjiFilterResult req
+     (KanjiFilterResult resp rads) <- runH $ getKanjiFilterResult req
 
-      [] @=? rads
-      mapM_ (uncurry chk) (zip mostUsedKanjis resp)
+     [] @=? rads
+     mapM_ (uncurry chk) (zip mostUsedKanjis resp)
+
+  , testCase "Search for valid Kanjis" $ do
+     let req = KanjiFilter "先皿 問 題" ("", OnYomi) []
+         chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
+         exp = [(KanjiT "先", MeaningT "before")
+               ,(KanjiT "皿", MeaningT "dish")
+               ,(KanjiT "問", MeaningT "question")
+               ,(KanjiT "題", MeaningT "topic")]
+
+     (KanjiFilterResult resp rads) <- runH $ getKanjiFilterResult req
+
+     (length exp) @=? (length resp)
+     mapM_ (uncurry chk) (zip exp resp)
+
+  , testCase "Ignore characters apart from Kanjis" $ do
+     let req = KanjiFilter "ab 先,34@&皿 あ「＊。￥ 問 題" ("", OnYomi) []
+         chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
+         exp = [(KanjiT "先", MeaningT "before")
+               ,(KanjiT "皿", MeaningT "dish")
+               ,(KanjiT "問", MeaningT "question")
+               ,(KanjiT "題", MeaningT "topic")]
+
+     (KanjiFilterResult resp rads) <- runH $ getKanjiFilterResult req
+
+     (length exp) @=? (length resp)
+     mapM_ (uncurry chk) (zip exp resp)
+
+  , testCase "Test OnYomi Filter" $ do
+     let req = KanjiFilter "" ("にん",OnYomi) []
+         chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
+         exp = [(KanjiT "任", MeaningT "responsibility")
+               ,(KanjiT "忍", MeaningT "endure")
+               ,(KanjiT "認", MeaningT "acknowledge")]
+
+     (KanjiFilterResult resp rads) <- runH $ getKanjiFilterResult req
+
+     (length exp) @=? (length resp)
+     mapM_ (uncurry chk) (zip exp resp)
+
+  , testCase "Test KunYomi Filter" $ do
+     let req = KanjiFilter "" ("%がた",KonYumi) []
+         chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
+         exp = [(KanjiT "田", MeaningT "rice field")
+               ,(KanjiT "咫", MeaningT "short")]
+
+     (KanjiFilterResult resp rads) <- runH $ getKanjiFilterResult req
+
+     pPrint resp
+     (length exp) @=? (length resp)
+     mapM_ (uncurry chk) (zip exp resp)
+
+  , testCase "Test KunYomi Filter with kanji input" $ do
+     let req = KanjiFilter "心" ("こころ",KonYumi) []
+         chk (k,m) (_,k',_,Just m') = (k,m) @=? (k' ,m')
+         exp = [(KanjiT "田", MeaningT "rice field")
+               ,(KanjiT "咫", MeaningT "short")]
+
+     (KanjiFilterResult resp rads) <- runH $ getKanjiFilterResult req
+
+     pPrint resp
+     (length exp) @=? (length resp)
+     mapM_ (uncurry chk) (zip exp resp)
   ]
 
 mostUsedKanjis =

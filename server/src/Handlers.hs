@@ -73,9 +73,9 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
             (map primaryKey ks)
 
     (on,ku,na) = case filtType of
-      OnYomi -> (filtTxt,"","")
-      KonYumi -> ("",filtTxt,"")
-      Nanori -> ("","",filtTxt)
+      OnYomi -> (filtTxt,"HACK","HACK")
+      KonYumi -> ("HACK",filtTxt,"HACK")
+      Nanori -> ("HACK","HACK",filtTxt)
 
     getRadicals kanjiList
       | (T.null inpTxt) && (T.null filtTxt)

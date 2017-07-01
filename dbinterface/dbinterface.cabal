@@ -34,3 +34,5 @@ library
                      , lens
                      , dbmodel
                      , containers
+                     , text
+                     , bytestring-trie
