@@ -1,8 +1,8 @@
 { mkDerivation, aeson, base, bytestring, dbinterface, dbmodel
-, houhou2-shared, lens, mtl, pretty-simple, protolude
+, houhou2-shared, http-types, lens, mtl, pretty-simple, protolude
 , reflex-websocket-interface-server
 , reflex-websocket-interface-shared, sqlite-simple, stdenv, tasty
-, tasty-hunit, text, time, wai-websockets
+, tasty-hunit, text, time, wai, wai-websockets, warp, websockets
 }:
 mkDerivation {
   pname = "houhou2-server";
@@ -11,9 +11,10 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    aeson base dbinterface dbmodel houhou2-shared lens mtl protolude
-    reflex-websocket-interface-server reflex-websocket-interface-shared
-    sqlite-simple text wai-websockets
+    aeson base dbinterface dbmodel houhou2-shared http-types lens mtl
+    protolude reflex-websocket-interface-server
+    reflex-websocket-interface-shared sqlite-simple text wai
+    wai-websockets warp websockets
   ];
   executableHaskellDepends = [ base ];
   testHaskellDepends = [

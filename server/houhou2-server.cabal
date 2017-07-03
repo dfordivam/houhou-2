@@ -29,7 +29,11 @@ library
   default-extensions:  NoImplicitPrelude
   build-depends:       base >=4.9 && <4.10
                      , protolude
+                     , warp
+                     , wai
                      , wai-websockets
+                     , websockets
+                     , http-types
                      , aeson
                      , dbinterface
                      , dbmodel

@@ -13,7 +13,7 @@ import DBInterface
 import Utils
 import qualified Data.Text as T
 
-type Handler = RWST Connection () HandlerState IO
+type HandlerM = RWST Connection () HandlerState IO
 
 data HandlerState = HandlerState
   { _kanjiSearchResult :: [DB.Kanji]
@@ -21,14 +21,14 @@ data HandlerState = HandlerState
   }
 makeLenses ''HandlerState
 
-runDB :: (DBMonad a) -> Handler a
+runDB :: (DBMonad a) -> HandlerM a
 runDB f = do
   conn <- ask
   res <- liftIO $ runReaderT f conn
   return res
 
 -- Pagination,
-getKanjiFilterResult :: KanjiFilter -> Handler KanjiFilterResult
+getKanjiFilterResult :: KanjiFilter -> HandlerM KanjiFilterResult
 getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
   let uniqKanji = ordNub $ getKanjis inpTxt
 
@@ -111,3 +111,9 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
         , RankT <$> (k ^. DB.kanjiMostUsedRank)
         , MeaningT <$> (DB._kanjiMeaningMeaning <$> m))
   return $ KanjiFilterResult l (DB.getKeys validRadicals)
+
+getLoadMoreKanjiResults :: LoadMoreKanjiResults -> HandlerM KanjiFilterResult
+getLoadMoreKanjiResults = undefined
+
+getKanjiDetails :: GetKanjiDetails -> HandlerM KanjiSelectionDetails
+getKanjiDetails = undefined
