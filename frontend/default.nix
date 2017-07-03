@@ -1,5 +1,6 @@
 { mkDerivation, aeson, base, bytestring, containers, file-embed
 , ghcjs-dom, houhou2-shared, reflex, reflex-dom, reflex-dom-core
+, reflex-websocket-interface, reflex-websocket-interface-shared
 , stdenv, text, uri-bytestring
 }:
 mkDerivation {
@@ -10,7 +11,8 @@ mkDerivation {
   isExecutable = true;
   executableHaskellDepends = [
     aeson base bytestring containers file-embed ghcjs-dom
-    houhou2-shared reflex reflex-dom reflex-dom-core text
+    houhou2-shared reflex reflex-dom reflex-dom-core
+    reflex-websocket-interface reflex-websocket-interface-shared text
     uri-bytestring
   ];
   description = "TODO";

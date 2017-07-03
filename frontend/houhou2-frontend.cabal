@@ -30,6 +30,7 @@ executable         houhou2-frontend
                 TupleSections
                 RecordWildCards
                 CPP
+                NoImplicitPrelude
 
     build-depends:
                   base
@@ -44,6 +45,10 @@ executable         houhou2-frontend
                 , file-embed
                 , uri-bytestring
                 , houhou2-shared
+                , reflex-websocket-interface-shared
+                , reflex-websocket-interface
+                , protolude
+                , primitive
 
   if impl(ghcjs)
     build-depends: ghcjs-base

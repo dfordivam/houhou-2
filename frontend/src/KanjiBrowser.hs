@@ -1,41 +1,59 @@
+{-# LANGUAGE RecursiveDo #-}
 module KanjiBrowser where
 
+import Protolude
 import Reflex.Dom
 import Message
+import Common
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Data.Aeson
-import Data.Monoid
+import Control.Monad.Primitive
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
-import Reflex.Dom.Contrib.WithWebSocket.Class
+import Reflex.WebSocket.WithWebSocket.Base
+import Reflex.WebSocket.WithWebSocket.Shared
 
+kanjiBrowseWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => WithWebSocketT Message.AppRequest t m ()
 kanjiBrowseWidget = do
 
-  rec
-    let
-      (validRadicalsEv,kanjiListEv)
-        = splitE (\KanjiFilterResult a b -> (a,b)) <$> filterResultEv
-    filterEv <- kanjiFilterWidget validRadicalsEv
+  ev <- getPostBuild
+  let
+    filterEv = never
+    filterEvWithPostBuild = leftmost [KanjiFilter "" ("", OnYomi) [] <$ ev,
+                                      filterEv]
 
-    filterResultEv <- getWebSocketResponse (DoKanjiFilter <$> filterEv)
+  filterResultEv <- getWebSocketResponse filterEvWithPostBuild
 
-    kanjiSelectionEv <- kanjiListWidget kanjiListEv
+  let
+    (kanjiListEv, validRadicalsEv)
+      = splitE $ (\(KanjiFilterResult a b) -> (a,b)) <$> filterResultEv
 
-    kanjiDetailsEv <- getWebSocketResponse
-      (GetKanjiDetails <$> kanjiSelectionEv)
+  filterEv1 <- kanjiFilterWidget validRadicalsEv
 
-    kanjiDetailsWidget kanjiDetailsEv
+  kanjiSelectionEv <- kanjiListWidget kanjiListEv
+
+  kanjiDetailsEv <- getWebSocketResponse
+    (GetKanjiDetails <$> kanjiSelectionEv)
+
+  kanjiDetailsWidget kanjiDetailsEv
 
   return ()
 -- Widget to show kanjifilter
 
-kanjiFilterWidget :: Event t [RadicalId] -> m (Event t KanjiFilter)
-kanjiFilterWidget = do
+kanjiFilterWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => Event t [RadicalId]
+  -> WithWebSocketT Message.AppRequest t m (Event t KanjiFilter)
+kanjiFilterWidget validRadicalsEv = do
   sentenceTextArea <- textArea def
   readingTextInput <- textInput def
   readingSelectionDropDown <- dropdown
@@ -52,60 +70,74 @@ kanjiFilterWidget = do
 
   return $ updated kanjiFilter
 
-radicalMatrix :: Event t [RadicalId] -> m (Dynamic t [RadicalId])
+radicalMatrix
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => Event t [RadicalId] -> m (Dynamic t [RadicalId])
 radicalMatrix evValid = do
+
+  -- validRadicals :: Dynamic t (Set RadicalId)
+  validRadicals <- holdDyn (Map.keysSet radicalTable) (Set.fromList <$> evValid)
 
   let
     renderMatrix = do
-      el "ul" $ mapM showRadical (toList radicalTable)
+      el "ul" $ mapM showRadical (Map.toList radicalTable)
 
-    showRadical (i,r) =
-      let valid = member i <$> validRadicals
-          sel = member i <$> selectedRadicals
+    showRadical (i,(RadicalDetails r)) = do
+      let valid = Set.member i <$> validRadicals
+          sel = pure False
+            -- Set.member i <$> selectedRadicals
           -- (Valid, Selected)
           cl (False,_) = "secondary label"
           cl (True, True) = "primary label"
           cl _ = ""
           attr = (\c -> ("class" =: c)) <$>
-                   (cl <$> combineDyn valid sel)
+                   (cl <$> zipDyn valid sel)
 
       (e,_) <- el' "li" $
         elDynAttr "span" attr $ text (show r)
       let ev = attachPromptlyDynWithMaybe f valid
                  (domEvent Click e)
-          f (True,_) = Just ()
-          f _ = Nothing
+          f True _ = Just ()
+          f _ _ = Nothing
       return (i <$ ev)
 
-  validRadicals :: Dynamic t (Set RadicalId)
-  validRadicals <- holdDyn (keys radicalTable) evValid
+  ev <- renderMatrix
 
-  ev <- renderMatrix validRadicals
-
-  selectedRadicals :: Dynamic t (Set RadicalId)
-  selectedRadicals <- foldDyn h empty ev
-  let h s i = if member i s then delete i s else insert i s
+  let
+    h :: RadicalId -> Set RadicalId -> Set RadicalId
+    h i s = if Set.member i s then Set.delete i s else Set.insert i s
+  selectedRadicals <- foldDyn h Set.empty (leftmost ev)
 
   return $ toList <$> selectedRadicals
 
 
-kanjiListWidget :: Event t KanjiList -> m (Event t KanjiId)
+kanjiListWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => Event t KanjiList -> m (Event t KanjiId)
 kanjiListWidget listEv = do
   let kanjiTable itms = do
         el "table" $ do
           let listItem itm@(i, _, _, _) = do
-                (e, _) <- el' "tr" $ el "td" $ show itm
+                (e, _) <- el' "tr" $ el "td" $ display (pure itm)
                 return (i <$ domEvent Click e)
-          mapM listItem itms
-  leftmost =<< widgetHold (return never) (kanjiTable <$> listEv)
+          evs <- mapM listItem itms
+          return $ leftmost evs
+  d <- widgetHold (return never) (kanjiTable <$> listEv)
+  let e = switchPromptlyDyn d
+  return e
   -- show list
 
-kanjiDetailsWidget :: Event t KanjiSelectionDetails -> m ()
-kanjiDetailsWidget (KanjiSelectionDetails k v) = do
-  kanjiDetailWindow k
-  vocabListWindow v
+kanjiDetailsWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => Event t KanjiSelectionDetails -> m ()
+kanjiDetailsWidget ev = do
+  let f (KanjiSelectionDetails k v) = do
+        display (pure k)
+        display (pure v)
+        return ()
+  void $ widgetHold (return ()) (f <$> ev)
 
 kanjiDetailWindow :: KanjiDetails -> m ()
-kanjiDetailWindow k = divClass "" $ text (show k)
+kanjiDetailWindow k = undefined
 vocabListWindow :: VocabDisplay -> m ()
-vocabListWindow v = divClass "" $ text (show v)
+vocabListWindow v = undefined

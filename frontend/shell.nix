@@ -6,8 +6,12 @@ let
 
   inherit (nixpkgs) pkgs;
 
+  reflex-websocket-interface-shared = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/typeclassbased/shared {};
+  reflex-websocket-interface = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/typeclassbased/frontend {inherit reflex-websocket-interface-shared;};
+
   drv = ghc.callPackage ./default.nix {
-    houhou2-shared = ghc.callPackage ../shared {};
+    inherit reflex-websocket-interface-shared reflex-websocket-interface;
+    houhou2-shared = ghc.callPackage ../shared {inherit reflex-websocket-interface-shared;};
     };
 
 in

@@ -55,7 +55,7 @@ radicalTable = Map.fromList $
   ,(RadicalId 3, RadicalDetails "c")]
 
 data FilterOptions = OnYomi | KonYumi | Nanori
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Ord, Generic, Show)
 
 type KanjiList =
    [(KanjiId, KanjiT, Maybe RankT, Maybe MeaningT)]
