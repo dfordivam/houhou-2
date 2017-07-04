@@ -35,6 +35,7 @@ library
                      , websockets
                      , http-types
                      , aeson
+                     , containers
                      , dbinterface
                      , dbmodel
                      , lens

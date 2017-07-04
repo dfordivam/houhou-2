@@ -8,7 +8,6 @@ module Common
 import Protolude
 -- import GHC.Generics
 import Data.Aeson
-import qualified Data.Map as Map
 
 -- import Data.Text
 
@@ -45,14 +44,6 @@ newtype KanjiId = KanjiId { unKanjiId :: Int }
 data RadicalDetails =
   RadicalDetails Text
   deriving (Eq, Generic, Show)
-
-type RadicalTable = Map RadicalId RadicalDetails
-
-radicalTable :: RadicalTable
-radicalTable = Map.fromList $
-  [(RadicalId 1, RadicalDetails "a")
-  ,(RadicalId 2, RadicalDetails "b")
-  ,(RadicalId 3, RadicalDetails "c")]
 
 data FilterOptions = OnYomi | KonYumi | Nanori
   deriving (Eq, Ord, Generic, Show)

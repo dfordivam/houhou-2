@@ -5,6 +5,7 @@ import Protolude
 import Reflex.Dom
 import Message
 import Common
+import Radicals
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -26,20 +27,27 @@ kanjiBrowseWidget
 kanjiBrowseWidget = do
 
   ev <- getPostBuild
-  let
-    filterEv = never
-    filterEvWithPostBuild = leftmost [KanjiFilter "" ("", OnYomi) [] <$ ev,
-                                      filterEv]
 
-  filterResultEv <- getWebSocketResponse filterEvWithPostBuild
+  rec
+    let
+      filterEvWithPostBuild = leftmost [KanjiFilter "" ("", OnYomi) [] <$ ev,
+                                        filterEv]
 
-  let
-    (kanjiListEv, validRadicalsEv)
-      = splitE $ (\(KanjiFilterResult a b) -> (a,b)) <$> filterResultEv
+    filterResultEv <- getWebSocketResponse filterEvWithPostBuild
 
-  filterEv1 <- kanjiFilterWidget validRadicalsEv
+    let
+      (kanjiListEv, validRadicalsEv)
+        = splitE $ (\(KanjiFilterResult a b) -> (a,b)) <$> filterResultEv
 
-  kanjiSelectionEv <- kanjiListWidget kanjiListEv
+      f (KanjiFilter "" ("", _) []) _ = Map.keys radicalTable
+      f _ r = []
+
+      validRadicals = attachPromptlyDynWith f filterDyn validRadicalsEv
+
+    kanjiSelectionEv <- kanjiListWidget kanjiListEv
+    filterEv <- kanjiFilterWidget validRadicals
+    filterDyn <- holdDyn (KanjiFilter "" ("", OnYomi) []) filterEv
+
 
   kanjiDetailsEv <- getWebSocketResponse
     (GetKanjiDetails <$> kanjiSelectionEv)
@@ -63,6 +71,7 @@ kanjiFilterWidget validRadicalsEv = do
 
   selectedRadicals <- radicalMatrix validRadicalsEv
   let
+    -- selectedRadicals = constDyn []
     kanjiFilter = KanjiFilter <$> (value sentenceTextArea)
           <*> (zipDynWith (,) (value readingTextInput)
               (value readingSelectionDropDown))
@@ -76,37 +85,41 @@ radicalMatrix
 radicalMatrix evValid = do
 
   -- validRadicals :: Dynamic t (Set RadicalId)
-  validRadicals <- holdDyn (Map.keysSet radicalTable) (Set.fromList <$> evValid)
+  evDelayed <- delay 1 evValid
+  validRadicals <- holdDyn (Map.keysSet radicalTable) (Set.fromList <$> evDelayed)
 
-  let
-    renderMatrix = do
-      el "ul" $ mapM showRadical (Map.toList radicalTable)
+  rec
+    let
+      renderMatrix = do
+        el "ul" $ mapM showRadical (Map.toList radicalTable)
 
-    showRadical (i,(RadicalDetails r)) = do
-      let valid = Set.member i <$> validRadicals
-          sel = pure False
-            -- Set.member i <$> selectedRadicals
-          -- (Valid, Selected)
-          cl (False,_) = "secondary label"
-          cl (True, True) = "primary label"
-          cl _ = ""
-          attr = (\c -> ("class" =: c)) <$>
-                   (cl <$> zipDyn valid sel)
+      showRadical (i,(RadicalDetails r)) = do
+        let valid =
+              Set.member i <$> validRadicals
+            sel =
+              -- pure False
+              Set.member i <$> selectedRadicals
+            -- (Valid, Selected)
+            cl (False,_) = "secondary label"
+            cl (True, True) = "primary label"
+            cl _ = ""
+            attr = (\c -> ("class" =: c)) <$>
+                     (cl <$> zipDyn valid sel)
 
-      (e,_) <- el' "li" $
-        elDynAttr "span" attr $ text (show r)
-      let ev = attachPromptlyDynWithMaybe f valid
-                 (domEvent Click e)
-          f True _ = Just ()
-          f _ _ = Nothing
-      return (i <$ ev)
+        (e,_) <- el' "li" $
+          elDynAttr "span" attr $ text r
+        let ev = -- attachDynWithMaybe f valid
+                   (domEvent Click e)
+            f True _ = Just ()
+            f _ _ = Nothing
+        return (i <$ ev)
 
-  ev <- renderMatrix
+    ev <- renderMatrix
 
-  let
-    h :: RadicalId -> Set RadicalId -> Set RadicalId
-    h i s = if Set.member i s then Set.delete i s else Set.insert i s
-  selectedRadicals <- foldDyn h Set.empty (leftmost ev)
+    let
+      h :: RadicalId -> Set RadicalId -> Set RadicalId
+      h i s = if Set.member i s then Set.delete i s else Set.insert i s
+    selectedRadicals <- foldDyn h Set.empty (traceEventWith show $ leftmost ev)
 
   return $ toList <$> selectedRadicals
 
@@ -117,8 +130,12 @@ kanjiListWidget
 kanjiListWidget listEv = do
   let kanjiTable itms = do
         el "table" $ do
-          let listItem itm@(i, _, _, _) = do
-                (e, _) <- el' "tr" $ el "td" $ display (pure itm)
+          let listItem itm@(i, k, r, m) = do
+                (e, _) <- el' "tr" $ do
+                  el "td" $ text $ (unKanjiT k)
+                  el "td" $ text $ maybe ""
+                    (\r1 -> "Rank: " <> show r1) (unRankT <$> r)
+                  el "td" $ text $ maybe "" identity (unMeaningT <$> m)
                 return (i <$ domEvent Click e)
           evs <- mapM listItem itms
           return $ leftmost evs
