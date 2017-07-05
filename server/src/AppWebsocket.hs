@@ -43,10 +43,8 @@ app handlerStateRef dbConn =
     loop conn = do
       d <- receiveData conn
       print d
-      -- let resp = handleRequest d
-      let r = undefined :: Message.AppRequest
-          rwst :: HandlerM ByteString
-          rwst = handleRequest r handler d
+      let
+          rwst = handleRequest handler d
 
       hState <- readIORef handlerStateRef
       (resp, newState, _) <- runRWST rwst dbConn hState
@@ -59,7 +57,8 @@ app handlerStateRef dbConn =
     backupApp :: Application
     backupApp _ respond = respond $ responseLBS status400 [] "Not a WebSocket request"
 
-handler =
+handler :: HandlerWrapper HandlerM Message.AppRequest
+handler = HandlerWrapper $
   h getKanjiFilterResult
   :<&> h getLoadMoreKanjiResults
   :<&> h getKanjiDetails
