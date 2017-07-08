@@ -17,8 +17,8 @@ import Network.Wai
 import Network.Wai.Handler.Warp
 import Network.Wai.Handler.WebSockets
 import Network.WebSockets
-import Reflex.WebSocket.WithWebSocket.Shared
-import Reflex.WebSocket.WithWebSocket.Server
+import Reflex.Dom.WebSocket.Message
+import Reflex.Dom.WebSocket.Server
 import qualified Database.SQLite.Simple as DB
 import qualified Message
 import Network.HTTP.Types.Status

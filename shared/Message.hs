@@ -9,8 +9,8 @@ module Message
 import Common
 import Protolude
 import Data.Aeson
-import Reflex.WebSocket.WithWebSocket.Shared
 
+import Reflex.Dom.WebSocket.Message
 -- Messages
 
 type AppRequest =

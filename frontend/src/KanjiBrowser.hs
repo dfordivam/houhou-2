@@ -18,8 +18,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
-import Reflex.WebSocket.WithWebSocket.Base
-import Reflex.WebSocket.WithWebSocket.Shared
+import Reflex.Dom.WebSocket.Monad
+import Reflex.Dom.WebSocket.Message
 
 kanjiBrowseWidget
   :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
@@ -40,7 +40,7 @@ kanjiBrowseWidget = do
         = splitE $ (\(KanjiFilterResult a b) -> (a,b)) <$> filterResultEv
 
       f (KanjiFilter "" ("", _) []) _ = Map.keys radicalTable
-      f _ r = []
+      f _ r = r
 
       validRadicals = attachPromptlyDynWith f filterDyn validRadicalsEv
 
@@ -91,7 +91,7 @@ radicalMatrix evValid = do
   rec
     let
       renderMatrix = do
-        el "ul" $ mapM showRadical (Map.toList radicalTable)
+        divClass "ui grid" $ mapM showRadical (Map.toList radicalTable)
 
       showRadical (i,(RadicalDetails r)) = do
         let valid =
@@ -100,15 +100,16 @@ radicalMatrix evValid = do
               -- pure False
               Set.member i <$> selectedRadicals
             -- (Valid, Selected)
-            cl (False,_) = "secondary label"
-            cl (True, True) = "primary label"
-            cl _ = ""
+            cl (_,True) = "ui icon green button"
+            cl (True, False) = "ui icon button"
+            cl (False,False) = "ui icon disabled button"
             attr = (\c -> ("class" =: c)) <$>
                      (cl <$> zipDyn valid sel)
 
-        (e,_) <- el' "li" $
-          elDynAttr "span" attr $ text r
-        let ev = -- attachDynWithMaybe f valid
+        (e,_) <- elAttr' "div" ("class" =: "column") $
+          elDynAttr "button" attr $ text r
+        let ev =
+              attachDynWithMaybe f valid
                    (domEvent Click e)
             f True _ = Just ()
             f _ _ = Nothing

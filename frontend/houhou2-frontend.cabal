@@ -49,6 +49,7 @@ executable         houhou2-frontend
                 , reflex-websocket-interface
                 , protolude
                 , primitive
+                , reflex-dom-semui
 
   if impl(ghcjs)
     build-depends: ghcjs-base
