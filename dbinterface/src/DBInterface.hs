@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module DBInterface
-  ( openDB
+  ( openKanjiDB
+  , openSrsDB
   , close
   , DBMonad
   , primaryKey
@@ -22,10 +23,12 @@ import Database.Beam
 import Database.SQLite.Simple
 import Database.Beam.Sqlite
 import qualified Data.Set as Set
+import Data.Time (LocalTime)
 
 import Control.Lens
 
-openDB = open "KanjiDatabase.sqlite"
+openKanjiDB = open "KanjiDatabase.sqlite"
+openSrsDB = open "SrsDatabase.sqlite"
 
 printResult :: (Show a) => a -> IO ()
 printResult a = putStrLn $ (show a :: Text)

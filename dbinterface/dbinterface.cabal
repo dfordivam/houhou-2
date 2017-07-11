@@ -36,3 +36,4 @@ library
                      , containers
                      , text
                      , bytestring-trie
+                     , time

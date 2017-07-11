@@ -28,6 +28,12 @@ makeLenses ''JMdictDb
 
 instance Database JMdictDb
 
+data SrsDb f = SrsDb
+  { srsDbTable :: f (TableEntity SrsEntryT)
+  } deriving (Generic)
+
+instance Database SrsDb
+
 jmdictDb :: DatabaseSettings be JMdictDb
 jmdictDb = defaultDbSettings `withDbModification`
   dbModification
@@ -113,5 +119,30 @@ jmdictDb = defaultDbSettings `withDbModification`
       {
          _vocabKanjiVocab  = VocabId $ fieldNamed "Vocabs_ID"
        , _vocabKanjiKanji  = KanjiId $ fieldNamed "Kanji_ID"
+      }
+  }
+
+srsDb :: DatabaseSettings be SrsDb
+srsDb = defaultDbSettings `withDbModification`
+  dbModification
+  { srsDbTable = modifyTable (\_ -> "SrsEntrySetNew") $
+      tableModification
+      {
+         _srsEntryId                = fieldNamed "ID"
+       , _srsEntryCreationDate      = fieldNamed "CreationDate"
+       , _srsEntryNextAnswerDate    = fieldNamed "NextAnswerDate"
+       , _srsEntryMeanings          = fieldNamed "Meanings"
+       , _srsEntryReadings          = fieldNamed "Readings"
+       , _srsEntryCurrentGrade      = fieldNamed "CurrentGrade"
+       , _srsEntryFailureCount      = fieldNamed "FailureCount"
+       , _srsEntrySuccessCount      = fieldNamed "SuccessCount"
+       , _srsEntryAssociatedVocab   = fieldNamed "AssociatedVocab"
+       , _srsEntryAssociatedKanji   = fieldNamed "AssociatedKanji"
+       , _srsEntryMeaningNote       = fieldNamed "MeaningNote"
+       , _srsEntryReadingNote       = fieldNamed "ReadingNote"
+       , _srsEntrySuspensionDate    = fieldNamed "SuspensionDate"
+       , _srsEntryTags              = fieldNamed "Tags"
+       , _srsEntryLastUpdateDate    = fieldNamed "LastUpdateDate"
+       , _srsEntryIsDeleted         = fieldNamed "IsDeleted"
       }
   }

@@ -7,6 +7,7 @@ import Protolude
 import Database.Beam
 import Control.Lens.TH
 import Data.Coerce
+import Data.Time (UTCTime)
 
 class UniqKey k where
   getKey :: (Coercible Int t) => k -> Maybe t
@@ -44,8 +45,9 @@ deriving instance Ord KanjiId
 deriving instance Eq KanjiId
 
 instance Table KanjiT where
-    data PrimaryKey KanjiT f = KanjiId (Columnar f (Auto Int)) deriving Generic
-    primaryKey = KanjiId . _kanjiId
+
+  data PrimaryKey KanjiT f = KanjiId (Columnar f (Auto Int)) deriving Generic
+  primaryKey = KanjiId . _kanjiId
 
 type KanjiId = PrimaryKey KanjiT Identity
 
@@ -366,3 +368,47 @@ instance Beamable (PrimaryKey VocabKanjiT)
 --     kanji         KanjiId     sql=Kanji_ID
 --     Primary kanji vocab
 --     deriving Show
+
+----------------------------------------------------------------------
+data SrsEntryT f = SrsEntry {
+    _srsEntryId               :: C f (Auto Int)
+  , _srsEntryCreationDate     :: C f (UTCTime)
+  , _srsEntryNextAnswerDate   :: C f (Maybe UTCTime)
+  , _srsEntryMeanings         :: C f (Text)
+  , _srsEntryReadings         :: C f (Text)
+  , _srsEntryCurrentGrade     :: C f (Int)
+  , _srsEntryFailureCount     :: C f (Int)
+  , _srsEntrySuccessCount     :: C f (Int)
+  , _srsEntryAssociatedVocab  :: C f (Maybe Text)
+  , _srsEntryAssociatedKanji  :: C f (Maybe Text)
+  , _srsEntryMeaningNote      :: C f (Maybe Text)
+  , _srsEntryReadingNote      :: C f (Maybe Text)
+  , _srsEntrySuspensionDate   :: C f (Maybe UTCTime)
+  , _srsEntryTags             :: C f (Maybe Text)
+  , _srsEntryLastUpdateDate   :: C f (Maybe UTCTime)
+  , _srsEntryIsDeleted        :: C f (Bool)
+  }
+  deriving (Generic)
+
+makeLenses ''SrsEntryT
+
+type SrsEntry = SrsEntryT Identity
+deriving instance Show SrsEntry
+deriving instance Show SrsEntryId
+deriving instance Ord SrsEntryId
+deriving instance Eq SrsEntryId
+
+instance Table SrsEntryT where
+    data PrimaryKey SrsEntryT f = SrsEntryId (Columnar f (Auto Int)) deriving Generic
+    primaryKey = SrsEntryId . _srsEntryId
+
+type SrsEntryId = PrimaryKey SrsEntryT Identity
+
+instance UniqKey SrsEntryId where
+  getKey (SrsEntryId k) = coerce k
+  makeKey t = SrsEntryId (coerce t)
+
+instance Beamable SrsEntryT
+instance Beamable (PrimaryKey SrsEntryT)
+
+----------------------------------------------------------------------
