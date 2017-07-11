@@ -17,5 +17,6 @@ executable fixsrsdb
   build-depends:       base >=4.9 && <4.10
                      , time
                      , sqlite-simple
+                     , bytestring
+                     , text
   default-language:    Haskell2010
-
