@@ -1,4 +1,4 @@
-{ mkDerivation, aeson, base, containers, protolude
+{ mkDerivation, aeson, base, containers, data-default, protolude
 , reflex-websocket-interface-shared, stdenv
 }:
 mkDerivation {
@@ -6,7 +6,8 @@ mkDerivation {
   version = "0.1.0.0";
   src = ./.;
   libraryHaskellDepends = [
-    aeson base containers protolude reflex-websocket-interface-shared
+    aeson base containers data-default protolude
+    reflex-websocket-interface-shared
   ];
   license = stdenv.lib.licenses.bsd3;
 }

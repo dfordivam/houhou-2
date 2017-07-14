@@ -3,12 +3,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Message
   where
 
 import Common
 import Protolude
 import Data.Aeson
+import Data.Default
 
 import Reflex.Dom.WebSocket.Message
 -- Messages
@@ -17,7 +19,37 @@ type AppRequest =
   KanjiFilter
   :<|> LoadMoreKanjiResults
   :<|> GetKanjiDetails
-  -- :<|>
+  :<|> VocabSearch
+
+data KanjiFilter = KanjiFilter
+  { textContent :: Text
+  , filter :: Filter
+  , selectedRadicals :: [RadicalId]
+  }
+  deriving (Generic, Show)
+
+instance Default KanjiFilter where
+  def = KanjiFilter "" def []
+
+instance WebSocketMessage AppRequest KanjiFilter where
+  type ResponseT AppRequest KanjiFilter = KanjiFilterResult
+
+data KanjiFilterResult =
+  KanjiFilterResult KanjiList --
+                    [RadicalId] -- Valid Radicals
+  deriving (Eq, Generic, Show)
+
+data GetKanjiDetails =
+  GetKanjiDetails KanjiId Filter
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest GetKanjiDetails where
+  type ResponseT AppRequest GetKanjiDetails = Maybe KanjiSelectionDetails
+
+data KanjiSelectionDetails =
+  KanjiSelectionDetails KanjiDetails
+                        [VocabDispItem]
+  deriving (Eq, Generic, Show)
 
 data LoadMoreKanjiResults = LoadMoreKanjiResults
   deriving (Generic, Show)
@@ -25,32 +57,11 @@ data LoadMoreKanjiResults = LoadMoreKanjiResults
 instance WebSocketMessage AppRequest LoadMoreKanjiResults where
   type ResponseT AppRequest LoadMoreKanjiResults = KanjiFilterResult
 
-data KanjiFilter = KanjiFilter
-  { textContent :: Text
-  , filter :: (Text, FilterOptions)
-  , selectedRadicals :: [RadicalId]
-  }
+data VocabSearch = VocabSearch Filter
   deriving (Generic, Show)
 
-data KanjiFilterResult =
-  KanjiFilterResult KanjiList --
-                    [RadicalId] -- Valid Radicals
-  deriving (Eq, Generic, Show)
-
-instance WebSocketMessage AppRequest KanjiFilter where
-  type ResponseT AppRequest KanjiFilter = KanjiFilterResult
-
-data GetKanjiDetails =
-  GetKanjiDetails KanjiId
-  deriving (Generic, Show)
-
-data KanjiSelectionDetails =
-  KanjiSelectionDetails KanjiDetails
-                        VocabDisplay
-  deriving (Eq, Generic, Show)
-
-instance WebSocketMessage AppRequest GetKanjiDetails where
-  type ResponseT AppRequest GetKanjiDetails = KanjiSelectionDetails
+instance WebSocketMessage AppRequest VocabSearch where
+  type ResponseT AppRequest VocabSearch = [VocabDispItem]
 
 instance ToJSON KanjiSelectionDetails where
   toEncoding = genericToEncoding defaultOptions
@@ -64,13 +75,13 @@ instance ToJSON KanjiFilter where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON KanjiFilter
 
-instance ToJSON FilterOptions where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON FilterOptions
-
 instance ToJSON GetKanjiDetails where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON GetKanjiDetails
+
+instance ToJSON VocabSearch where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON VocabSearch
 
 instance ToJSON LoadMoreKanjiResults where
   toEncoding = genericToEncoding defaultOptions

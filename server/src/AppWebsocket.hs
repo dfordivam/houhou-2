@@ -8,7 +8,7 @@ module AppWebsocket where
 
 import Protolude
 import Handlers
-import DBInterface (openDB)
+import DBInterface (openKanjiDB)
 
 import Control.Monad.RWS
 import Data.IORef
@@ -27,7 +27,7 @@ mainWebSocketHandler :: IO ()
 mainWebSocketHandler = do
   handlerStateRef <- newIORef $
                      HandlerState [] 20
-  dbConn <- openDB
+  dbConn <- openKanjiDB
   runEnv 3000 (app handlerStateRef dbConn)
 
 
@@ -62,6 +62,7 @@ handler = HandlerWrapper $
   h getKanjiFilterResult
   :<&> h getLoadMoreKanjiResults
   :<&> h getKanjiDetails
+  :<&> h getVocabSearch
 
   where
   h :: (WebSocketMessage Message.AppRequest a, Monad m)

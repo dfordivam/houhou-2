@@ -1,6 +1,6 @@
-{ mkDerivation, aeson, base, bytestring, containers, file-embed
-, ghcjs-dom, houhou2-shared, primitive, protolude, reflex
-, reflex-dom, reflex-dom-core, reflex-dom-semui
+{ mkDerivation, aeson, base, bytestring, containers, data-default
+, file-embed, ghcjs-dom, houhou2-shared, primitive, protolude
+, reflex, reflex-dom, reflex-dom-core, reflex-dom-semui
 , reflex-websocket-interface, reflex-websocket-interface-shared
 , stdenv, text, uri-bytestring
 }:
@@ -11,7 +11,7 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    aeson base bytestring containers file-embed ghcjs-dom
+    aeson base bytestring containers data-default file-embed ghcjs-dom
     houhou2-shared primitive protolude reflex reflex-dom
     reflex-dom-core reflex-dom-semui reflex-websocket-interface
     reflex-websocket-interface-shared text uri-bytestring

@@ -50,6 +50,7 @@ executable         houhou2-frontend
                 , protolude
                 , primitive
                 , reflex-dom-semui
+                , data-default
 
   if impl(ghcjs)
     build-depends: ghcjs-base

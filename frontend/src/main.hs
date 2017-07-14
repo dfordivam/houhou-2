@@ -5,16 +5,21 @@ import KanjiBrowser
 import Reflex.Dom.WebSocket.Monad
 import Reflex.Dom.WebSocket.Message
 import Reflex.Dom.SemanticUI
+import Message (AppRequest)
+import Control.Monad.Primitive
 
-main = mainWidget $ divClass "ui container" $ do
-  text "Welcome to Houhou"
-  elClass "h4" "ui header" $ do
-    text "Dropdowns"
-    uiButton (rightFloated . blue . mini . compact . basic <$> def) $ text "Reset"
+main = mainWidget $ do
   let url = "ws://localhost:3000/"
   withWSConnection
     url
     never -- close event
     True -- reconnect
-    kanjiBrowseWidget
+    topWidget
   return ()
+
+topWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => WithWebSocketT Message.AppRequest t m ()
+topWidget = divClass "ui grid container" $ do
+  -- navigation with visibility control
+  kanjiBrowseWidget

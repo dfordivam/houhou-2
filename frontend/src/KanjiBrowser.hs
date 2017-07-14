@@ -1,7 +1,8 @@
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module KanjiBrowser where
 
-import Protolude
+import Protolude hiding (link)
 import Reflex.Dom
 import Message
 import Common
@@ -20,17 +21,19 @@ import qualified Data.ByteString.Lazy as BSL
 
 import Reflex.Dom.WebSocket.Monad
 import Reflex.Dom.WebSocket.Message
+data VisibleWidget = KanjiFilterVis | KanjiDetailPageVis
+  deriving (Eq)
 
 kanjiBrowseWidget
   :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => WithWebSocketT Message.AppRequest t m ()
-kanjiBrowseWidget = do
+kanjiBrowseWidget = divClass "ui internally celled grid" $ divClass "row" $ do
 
   ev <- getPostBuild
 
   rec
     let
-      filterEvWithPostBuild = leftmost [KanjiFilter "" ("", OnYomi) [] <$ ev,
+      filterEvWithPostBuild = leftmost [def <$ ev,
                                         filterEv]
 
     filterResultEv <- getWebSocketResponse filterEvWithPostBuild
@@ -39,42 +42,81 @@ kanjiBrowseWidget = do
       (kanjiListEv, validRadicalsEv)
         = splitE $ (\(KanjiFilterResult a b) -> (a,b)) <$> filterResultEv
 
-      f (KanjiFilter "" ("", _) []) _ = Map.keys radicalTable
+      f (KanjiFilter "" (Filter "" _ "") []) _ = Map.keys radicalTable
       f _ r = r
 
       validRadicals = attachPromptlyDynWith f filterDyn validRadicalsEv
 
-    kanjiSelectionEv <- kanjiListWidget kanjiListEv
-    filterEv <- kanjiFilterWidget validRadicals
-    filterDyn <- holdDyn (KanjiFilter "" ("", OnYomi) []) filterEv
+    filterDyn <- holdDyn def filterEv
 
 
-  kanjiDetailsEv <- getWebSocketResponse
-    (GetKanjiDetails <$> kanjiSelectionEv)
+    filterEv <- divClass "twelve wide column" $ do
 
-  kanjiDetailsWidget kanjiDetailsEv
+      rec
+        let visEv = leftmost [KanjiFilterVis <$ closeEv, KanjiDetailPageVis <$ kanjiDetailsEv]
+        vis <- holdDyn KanjiFilterVis visEv
+        let
+
+        -- Show either the filter options or the kanji details page
+        filterEv <- handleVisibility KanjiFilterVis vis $
+          kanjiFilterWidget validRadicals
+
+        maybeKanjiDetailsEv <- getWebSocketResponse
+          ((flip GetKanjiDetails) def <$> kanjiSelectionEv)
+
+        closeEv <- handleVisibility KanjiDetailPageVis vis $ do
+          l <- linkClass "Close Details Page" "ui top attached button"
+          return (_link_clicked l)
+
+        let kanjiDetailsEv = fmapMaybe identity maybeKanjiDetailsEv
+        handleVisibility KanjiDetailPageVis vis $
+          kanjiDetailsWidget kanjiDetailsEv
+
+      return filterEv
+
+    kanjiSelectionEv <-
+      divClass "four wide column" $ do
+        kanjiListWidget kanjiListEv
 
   return ()
 -- Widget to show kanjifilter
+
+handleVisibility
+  :: (PostBuild t m, DomBuilder t m, Eq a)
+  => a -> Dynamic t a -> m v -> m v
+handleVisibility v dv mv = elDynAttr "div" (f <$> dv) mv
+  where
+    f dv =
+      if v == dv
+        then Map.empty
+        else ("style" =: "display: none;")
 
 kanjiFilterWidget
   :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => Event t [RadicalId]
   -> WithWebSocketT Message.AppRequest t m (Event t KanjiFilter)
 kanjiFilterWidget validRadicalsEv = do
-  sentenceTextArea <- textArea def
-  readingTextInput <- textInput def
-  readingSelectionDropDown <- dropdown
-    KonYumi
-    (constDyn ((KonYumi =: "Kunyomi") <> (OnYomi =: "Onyomi ")))
-    def
+  sentenceTextArea <- divClass "row" $ textArea def
+
+  (readingTextInput, readingSelectionDropDown, meaningTextInput)
+    <- divClass "row" $ do
+    t <- textInput def
+    d <- dropdown
+      KunYomi
+      (constDyn ((KunYomi =: "Kunyomi") <> (OnYomi =: "Onyomi ")))
+      def
+    m <- textInput def
+    return (t,d,m)
+
+  let filterDyn = Filter <$> (value readingTextInput)
+                    <*> (value readingSelectionDropDown)
+                    <*> (value meaningTextInput)
 
   selectedRadicals <- radicalMatrix validRadicalsEv
   let
     -- selectedRadicals = constDyn []
     kanjiFilter = KanjiFilter <$> (value sentenceTextArea)
-          <*> (zipDynWith (,) (value readingTextInput)
-              (value readingSelectionDropDown))
+          <*> filterDyn
           <*> selectedRadicals
 
   return $ updated kanjiFilter
@@ -93,7 +135,7 @@ radicalMatrix evValid = do
       renderMatrix = do
         divClass "ui grid" $ mapM showRadical (Map.toList radicalTable)
 
-      showRadical (i,(RadicalDetails r)) = do
+      showRadical (i,(RadicalDetails r _)) = do
         let valid =
               Set.member i <$> validRadicals
             sel =
@@ -150,12 +192,35 @@ kanjiDetailsWidget
   => Event t KanjiSelectionDetails -> m ()
 kanjiDetailsWidget ev = do
   let f (KanjiSelectionDetails k v) = do
-        display (pure k)
+        kanjiDetailWindow k
         display (pure v)
         return ()
   void $ widgetHold (return ()) (f <$> ev)
 
-kanjiDetailWindow :: KanjiDetails -> m ()
-kanjiDetailWindow k = undefined
+kanjiDetailWindow :: (DomBuilder t m) => KanjiDetails -> m ()
+kanjiDetailWindow (KanjiDetails k r m g j w on ku no) = do
+  divClass "ui grid container row" $ do
+    divClass "ui divider four wide column" $ do
+      divClass "row" $ do
+        elClass "i" "bordered big icon" $
+          text (unKanjiT k)
+      divClass "row" $ do
+        text "Radicals here"
+
+    divClass "eight wide column" $ do
+      divClass "row" $ do
+        textMay (unMeaningT <$> m)
+
+      divClass "row" $ do
+        textMay (tshow <$> (unRankT <$> r))
+
+      divClass "row" $ do
+        textMay (unOnYomiT <$> on)
+        textMay (unKunYomiT <$> ku)
+
 vocabListWindow :: VocabDisplay -> m ()
 vocabListWindow v = undefined
+
+tshow = T.pack . show
+textMay (Just v) = text v
+textMay Nothing = text ""

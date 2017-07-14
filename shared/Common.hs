@@ -8,12 +8,13 @@ module Common
 import Protolude
 -- import GHC.Generics
 import Data.Aeson
+import Data.Default
 
 -- import Data.Text
 
 -- New Types
 newtype KanjiT = KanjiT { unKanjiT :: Text }
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Ord, Generic, Show)
 newtype RankT = RankT { unRankT :: Int }
   deriving (Eq, Generic, Show)
 newtype MeaningT = MeaningT { unMeaningT :: Text }
@@ -21,8 +22,6 @@ newtype MeaningT = MeaningT { unMeaningT :: Text }
 newtype GradeT = GradeT { unGradeT :: Int }
   deriving (Eq, Generic, Show)
 newtype StrokeCountT = StrokeCountT { unStrokeCountT :: Int }
-  deriving (Eq, Generic, Show)
-newtype MostUsedRankT = MostUsedRankT { unMostUsedRankT :: Int }
   deriving (Eq, Generic, Show)
 newtype JlptLevelT = JlptLevelT { unJlptLevelT :: Int }
   deriving (Eq, Generic, Show)
@@ -38,30 +37,42 @@ newtype RadicalId = RadicalId { unRadicalId :: Int }
   deriving (Generic, Show, Eq, Ord)
 newtype KanjiId = KanjiId { unKanjiId :: Int }
   deriving (Generic, Show, Eq, Ord)
+newtype VocabT = VocabT { unVocabT :: [KanjiOrKana] }
+  deriving (Generic, Show, Eq, Ord)
 
 -- Kanji Widget related data
 
 data RadicalDetails =
-  RadicalDetails Text
+  RadicalDetails Text Text
   deriving (Eq, Generic, Show)
 
-data FilterOptions = OnYomi | KonYumi | Nanori
+data Filter = Filter
+  { readingKana :: Text
+  , readingType :: ReadingType
+  , meaningText :: Text
+  }
+  deriving (Generic, Show)
+
+instance Default Filter where
+  def = Filter "" KunYomi ""
+
+data ReadingType = OnYomi | KunYomi | Nanori
   deriving (Eq, Ord, Generic, Show)
 
 type KanjiList =
    [(KanjiId, KanjiT, Maybe RankT, Maybe MeaningT)]
 
+-- Newspaper rank
 data KanjiDetails =
   KanjiDetails KanjiT
-               RankT
-               MeaningT
-               GradeT
-               MostUsedRankT
-               JlptLevelT
-               WkLevelT
-               OnYomiT
-               KunYomiT
-               NanoriT
+               (Maybe RankT)
+               (Maybe MeaningT)
+               (Maybe GradeT)
+               (Maybe JlptLevelT)
+               (Maybe WkLevelT)
+               (Maybe OnYomiT)
+               (Maybe KunYomiT)
+               (Maybe NanoriT)
   deriving (Eq, Generic, Show)
 
 
@@ -72,7 +83,15 @@ data VocabDisplay = VocabDisplay
   deriving (Eq, Generic, Show)
 
 data VocabDispItem = VocabDispItem
+  VocabT (Maybe MeaningT) (Maybe RankT) [VocabCategory]
   deriving (Eq, Generic, Show)
+
+data KanjiOrKana
+  = Kanji KanjiT Text
+  | Kana Text
+  deriving (Eq, Ord, Generic, Show)
+
+type VocabCategory = Text
 
 -- Instance declarations
 instance ToJSON KanjiT where
@@ -103,9 +122,6 @@ instance ToJSON GradeT where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON GradeT
 
-instance ToJSON MostUsedRankT where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON MostUsedRankT
 instance ToJSON JlptLevelT where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON JlptLevelT
@@ -131,6 +147,15 @@ instance FromJSON VocabDisplay
 instance ToJSON VocabDispItem where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON VocabDispItem
--- instance ToJSON  where
---   toEncoding = genericToEncoding defaultOptions
--- instance FromJSON
+instance ToJSON VocabT where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON VocabT
+instance ToJSON KanjiOrKana where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON KanjiOrKana
+instance ToJSON Filter where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Filter
+instance ToJSON ReadingType where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON ReadingType

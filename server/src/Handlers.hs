@@ -1,10 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 module Handlers where
 
 import Protolude hiding ((&))
 import Control.Lens
 import qualified Model as DB
+import Model hiding (KanjiId, KanjiT)
 import Control.Monad.RWS
 import Database.SQLite.Simple
 import Message
@@ -29,7 +31,7 @@ runDB f = do
 
 -- Pagination,
 getKanjiFilterResult :: KanjiFilter -> HandlerM KanjiFilterResult
-getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
+getKanjiFilterResult (KanjiFilter inpTxt (Filter filtTxt filtType _) rads) = do
   let uniqKanji = ordNub $ getKanjis inpTxt
 
   -- inpTxt in empty
@@ -74,7 +76,7 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
 
     (on,ku,na) = case filtType of
       OnYomi -> (filtTxt,"HACK","HACK")
-      KonYumi -> ("HACK",filtTxt,"HACK")
+      KunYomi -> ("HACK",filtTxt,"HACK")
       Nanori -> ("HACK","HACK",filtTxt)
 
     getRadicals kanjiList
@@ -115,5 +117,24 @@ getKanjiFilterResult (KanjiFilter inpTxt (filtTxt, filtType) rads) = do
 getLoadMoreKanjiResults :: LoadMoreKanjiResults -> HandlerM KanjiFilterResult
 getLoadMoreKanjiResults = undefined
 
-getKanjiDetails :: GetKanjiDetails -> HandlerM KanjiSelectionDetails
-getKanjiDetails = undefined
+getKanjiDetails :: GetKanjiDetails -> HandlerM (Maybe KanjiSelectionDetails)
+getKanjiDetails (GetKanjiDetails kId _) = do
+  ks <- runDB $ getKanji (makeKeys [kId])
+  m <- runDB $ getKanjiMeaning (makeKey $ Just kId)
+  let
+    kd = f <$> headMay ks
+    f k =
+      KanjiDetails (KanjiT $ k ^. kanjiCharacter)
+        (RankT <$> k ^. kanjiMostUsedRank)
+        (MeaningT <$> (_kanjiMeaningMeaning <$> m))
+        (GradeT <$> k ^. kanjiGrade)
+        (JlptLevelT <$> k ^. kanjiJlptLevel)
+        (WkLevelT <$> k ^. kanjiWkLevel)
+        (OnYomiT <$> k ^. kanjiOnyomi)
+        (KunYomiT <$> k ^. kanjiKunyomi)
+        (NanoriT <$> k ^. kanjiNanori)
+
+  return $ KanjiSelectionDetails <$> kd <*> pure []
+
+getVocabSearch :: VocabSearch -> HandlerM [VocabDispItem]
+getVocabSearch = undefined
