@@ -13,6 +13,10 @@ module DBInterface
   , getKanjiMeaning
   , getValidRadicalList
   , getKanji
+  , getVocab
+  , getRelatedVocab
+  , getVocabMeaning
+  , filterVocab
   ) where
 
 import Model
@@ -24,6 +28,7 @@ import Database.SQLite.Simple
 import Database.Beam.Sqlite
 import qualified Data.Set as Set
 import Data.Time (LocalTime)
+import qualified Data.Text as T
 
 import Control.Lens
 
@@ -58,7 +63,6 @@ searchKanjiByReading
   -> DBMonad [Kanji]
 searchKanjiByReading [] on ku na = do
   ks <- selectListQuery query
-  liftIO $ print ks
   return ks
   where
     likeMaybe_ f v = maybe_ (val_ False) ((flip like_) (val_ (v <> "%"))) f
@@ -72,7 +76,6 @@ searchKanjiByReading [] on ku na = do
 
 searchKanjiByReading inp on ku na = do
   ks <- forM inp (\i -> (selectListQuery $ query i))
-  liftIO $ print ks
   return $ concat ks
   where
     likeMaybe_ f v = maybe_ (val_ False) ((flip like_) (val_ (v <> "%"))) f
@@ -113,11 +116,11 @@ filterKanjiByRadical (r1:rs) ks = do
     --                 (all_ (_jmdictKanjiRadical jmdictDb)))
     --   selectListQuery query
 
-getKanjiMeaning :: KanjiId -> DBMonad (Maybe KanjiMeaning)
+getKanjiMeaning :: KanjiId -> DBMonad [KanjiMeaning]
 getKanjiMeaning kId =
-  headMay <$> selectListQuery query
+  selectListQuery query
   where
-    query = limit_ 1 $
+    query =
       filter_ (\k -> (k ^. kanjiMeaningKanji) ==. val_ kId) $
         (all_ (_jmdictKanjiMeaning jmdictDb))
 
@@ -150,3 +153,75 @@ getKanji ks = do
         withDatabaseDebug putStrLn conn $ runSelectReturningOne (query k)
   rs <- forM ks fun
   return $ catMaybes rs
+
+getVocab :: [VocabId] -> DBMonad [Vocab]
+getVocab ks = do
+  conn <- ask
+  let query k = lookup (_jmdictVocab jmdictDb) k
+      fun k = liftIO $
+        withDatabaseDebug putStrLn conn $ runSelectReturningOne (query k)
+  rs <- forM ks fun
+  return $ catMaybes rs
+
+getRelatedVocab :: [KanjiId] -> DBMonad [VocabId]
+getRelatedVocab ks = do
+  rs <- forM ks (\k -> (selectListQuery $ query k))
+  return $ ordNub $ concat rs
+  where
+      query k = map _vocabKanjiVocab $
+              filter_ (\r -> r ^. vocabKanjiKanji ==. val_ k)
+                (all_ (_jmdictVocabKanji jmdictDb))
+
+getVocabMeaning :: VocabId -> DBMonad [VocabMeaning]
+getVocabMeaning v = do
+  mIds <- selectListQuery query
+  conn <- ask
+  let
+    fun k = liftIO $
+        withDatabaseDebug putStrLn conn $
+          runSelectReturningOne (lookup (_jmdictVocabMeaning jmdictDb) k)
+  ms <- forM mIds fun
+  return $ catMaybes ms
+  where
+    query = map _vocabVocabMeaningMeaning $
+      filter_ (\k -> (k ^. vocabVocabMeaningVocab) ==. val_ v) $
+        (all_ (_jmdictVocabVocabMeaning jmdictDb))
+
+filterVocabByReading :: Text -> DBMonad [VocabId]
+filterVocabByReading r = do
+  selectListQuery query
+  where
+    likeMaybe_ f v = maybe_ (val_ False) ((flip like_) (val_ (v <> "%"))) f
+    query = map primaryKey $
+      filter_
+        (\v ->
+            (((v ^. vocabKanjiWriting) `likeMaybe_` r) ||.
+            ((v ^. vocabKanaWriting) `like_` val_ (r <> "%")))) $
+        (all_ (_jmdictVocab jmdictDb))
+
+filterVocabByMeaning :: Text -> DBMonad [VocabId]
+filterVocabByMeaning m = do
+  ms <- selectListQuery query
+  vs <- forM ms (\i -> selectListQuery $ query2 i)
+  return $ ordNub $ concat vs
+  where
+    query = map primaryKey $ limit_ 50 $
+      filter_
+        (\v ->
+            (((v ^. vocabMeaningMeaning) `like_` val_ (m <> "%")) ||.
+            ((v ^. vocabMeaningMeaning) `like_` val_ ("% " <> m <> "%")))) $
+        (all_ (_jmdictVocabMeaning jmdictDb))
+
+    query2 i = map _vocabVocabMeaningVocab $
+      filter_ (\k -> (k ^. vocabVocabMeaningMeaning) ==. val_ i) $
+        (all_ (_jmdictVocabVocabMeaning jmdictDb))
+
+filterVocab :: Text -> Text -> DBMonad [VocabId]
+filterVocab r m
+  | T.null r && T.null m = return []
+  | T.null r = filterVocabByMeaning m
+  | T.null m = filterVocabByReading r
+  | otherwise = do
+    vs <- filterVocabByMeaning m
+    vs2 <-filterVocabByReading r
+    return $ Set.toList $ Set.intersection (Set.fromList vs) (Set.fromList vs2)

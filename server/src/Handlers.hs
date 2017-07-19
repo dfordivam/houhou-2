@@ -106,8 +106,8 @@ getKanjiFilterResult (KanjiFilter inpTxt (Filter filtTxt filtType _) rads) = do
             zip displayKanjiListKIds $
             zip displayKanjiList meanings
       convertKanji
-        :: (KanjiId, (DB.Kanji, Maybe DB.KanjiMeaning))
-        -> (KanjiId, KanjiT, Maybe RankT, Maybe MeaningT)
+        :: (KanjiId, (DB.Kanji, [DB.KanjiMeaning]))
+        -> (KanjiId, KanjiT, Maybe RankT, [MeaningT])
       convertKanji (i,(k,m)) =
         (i, KanjiT $ k ^. DB.kanjiCharacter
         , RankT <$> (k ^. DB.kanjiMostUsedRank)
@@ -134,7 +134,25 @@ getKanjiDetails (GetKanjiDetails kId _) = do
         (KunYomiT <$> k ^. kanjiKunyomi)
         (NanoriT <$> k ^. kanjiNanori)
 
-  return $ KanjiSelectionDetails <$> kd <*> pure []
+  let f v = do
+        ms <- getVocabMeaning (primaryKey v)
+        return $ VocabDispItem (getVocabT v)
+                (RankT <$> v ^. vocabFreqRank)
+                (map (MeaningT . _vocabMeaningMeaning) ms)
+                (JlptLevelT <$> v ^. vocabJlptLevel)
+                (WkLevelT <$> v ^. vocabWkLevel)
+                (WikiRank <$> v ^. vocabWikiRank)
+  vs <- runDB $ mapM f =<< getVocab =<< getRelatedVocab (map primaryKey ks)
+  return $ KanjiSelectionDetails <$> kd <*> pure vs
 
 getVocabSearch :: VocabSearch -> HandlerM [VocabDispItem]
-getVocabSearch = undefined
+getVocabSearch (VocabSearch (Filter r _ m)) = do
+  let f v = do
+        ms <- getVocabMeaning (primaryKey v)
+        return $ VocabDispItem (getVocabT v)
+                (RankT <$> v ^. vocabFreqRank)
+                (map (MeaningT . _vocabMeaningMeaning) ms)
+                (JlptLevelT <$> v ^. vocabJlptLevel)
+                (WkLevelT <$> v ^. vocabWkLevel)
+                (WikiRank <$> v ^. vocabWikiRank)
+  runDB $ mapM f =<<  getVocab =<< filterVocab r m

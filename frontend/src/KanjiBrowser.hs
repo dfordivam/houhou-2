@@ -178,7 +178,7 @@ kanjiListWidget listEv = do
                   el "td" $ text $ (unKanjiT k)
                   el "td" $ text $ maybe ""
                     (\r1 -> "Rank: " <> show r1) (unRankT <$> r)
-                  el "td" $ text $ maybe "" identity (unMeaningT <$> m)
+                  el "td" $ text $ T.intercalate "," $ map unMeaningT m
                 return (i <$ domEvent Click e)
           evs <- mapM listItem itms
           return $ leftmost evs
@@ -193,7 +193,7 @@ kanjiDetailsWidget
 kanjiDetailsWidget ev = do
   let f (KanjiSelectionDetails k v) = do
         kanjiDetailWindow k
-        display (pure v)
+        vocabListWindow v
         return ()
   void $ widgetHold (return ()) (f <$> ev)
 
@@ -209,7 +209,7 @@ kanjiDetailWindow (KanjiDetails k r m g j w on ku no) = do
 
     divClass "eight wide column" $ do
       divClass "row" $ do
-        textMay (unMeaningT <$> m)
+        text $ T.intercalate "," $ map unMeaningT m
 
       divClass "row" $ do
         textMay (tshow <$> (unRankT <$> r))
@@ -218,8 +218,39 @@ kanjiDetailWindow (KanjiDetails k r m g j w on ku no) = do
         textMay (unOnYomiT <$> on)
         textMay (unKunYomiT <$> ku)
 
-vocabListWindow :: VocabDisplay -> m ()
-vocabListWindow v = undefined
+vocabListWindow :: _ => [VocabDispItem] -> m ()
+vocabListWindow vs = do
+  let
+    dispVocab
+      (VocabDispItem v r m j w wi) = divClass "row" $ do
+      divClass "ui six wide column grid" $ do
+        displayVocabT v
+
+      divClass "ui six wide column grid" $ do
+        divClass "row" $ do
+          text $ T.intercalate "," $ map unMeaningT m
+
+        divClass "row" $ do
+          textMay (tshow <$> (unRankT <$> r))
+
+        divClass "row" $ do
+          textMay (tshow <$> (unWikiRank <$> wi))
+          textMay (tshow <$> (unWkLevelT <$> w))
+
+  divClass "ui grid container" $ do
+    forM_ vs dispVocab
+
+displayVocabT :: _ => VocabT -> m ()
+displayVocabT (VocabT ks) = do
+  let
+    f k = case k of
+      (Kanji k f) -> divClass "column wide two" $ do
+        divClass "row" $ text f
+        divClass "row" $ text $ unKanjiT k
+      (Kana t) -> divClass "column wide two" $ do
+        divClass "row" $ text ""
+        divClass "row" $ text t
+  mapM_ f ks
 
 tshow = T.pack . show
 textMay (Just v) = text v

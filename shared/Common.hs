@@ -25,6 +25,8 @@ newtype StrokeCountT = StrokeCountT { unStrokeCountT :: Int }
   deriving (Eq, Generic, Show)
 newtype JlptLevelT = JlptLevelT { unJlptLevelT :: Int }
   deriving (Eq, Generic, Show)
+newtype WikiRank = WikiRank { unWikiRank :: Int }
+  deriving (Eq, Generic, Show)
 newtype WkLevelT = WkLevelT { unWkLevelT :: Int }
   deriving (Eq, Generic, Show)
 newtype OnYomiT = OnYomiT { unOnYomiT :: Text }
@@ -60,13 +62,13 @@ data ReadingType = OnYomi | KunYomi | Nanori
   deriving (Eq, Ord, Generic, Show)
 
 type KanjiList =
-   [(KanjiId, KanjiT, Maybe RankT, Maybe MeaningT)]
+   [(KanjiId, KanjiT, Maybe RankT, [MeaningT])]
 
 -- Newspaper rank
 data KanjiDetails =
   KanjiDetails KanjiT
                (Maybe RankT)
-               (Maybe MeaningT)
+               ([MeaningT])
                (Maybe GradeT)
                (Maybe JlptLevelT)
                (Maybe WkLevelT)
@@ -82,8 +84,13 @@ data VocabDisplay = VocabDisplay
   }
   deriving (Eq, Generic, Show)
 
-data VocabDispItem = VocabDispItem
-  VocabT (Maybe MeaningT) (Maybe RankT) [VocabCategory]
+data VocabDispItem =
+  VocabDispItem VocabT
+                (Maybe RankT)
+                ([MeaningT])
+                (Maybe JlptLevelT)
+                (Maybe WkLevelT)
+                (Maybe WikiRank)
   deriving (Eq, Generic, Show)
 
 data KanjiOrKana
@@ -128,6 +135,9 @@ instance FromJSON JlptLevelT
 instance ToJSON StrokeCountT where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON StrokeCountT
+instance ToJSON WikiRank where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON WikiRank
 instance ToJSON WkLevelT where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON WkLevelT

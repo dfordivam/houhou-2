@@ -1,8 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Utils where
 
 import Protolude
+import Control.Lens
 import qualified Data.Text as T
 import Data.Char
+import Common
+import qualified Model as DB
+import Model hiding (KanjiId, KanjiT, VocabT, Kanji)
+import Text.Pretty.Simple
+import Control.Exception (assert)
 
 -- Hiragana ( 3040 - 309f)
 -- Katakana ( 30a0 - 30ff)
@@ -16,3 +23,67 @@ getKanjis inp = map T.pack $ map (:[]) $ filter isKanji $ T.unpack inp
   where isKanji c = c > l && c < h
         l = chr $ 13312 -- 0x3400
         h = chr $ 40879 -- 0x9faf
+
+-- 1034|其の実|そのじつ|0||0:そ;2:じつ||||607|0
+-- 204|お化け屋敷|おばけやしき|0||1:ば;3:や;4:しき||||137|1
+    -- , _vocabKanjiWriting = Just "一人につき"
+    -- , _vocabKanaWriting = "ひとりにつき"
+    -- , _vocabFurigana = Just "0-1:ひとり"
+
+getVocabT :: DB.Vocab -> VocabT
+getVocabT v =
+  case (kw, f) of
+    (Just w, Just f) -> VocabT $ makeKanjiKana furs w 0
+      where furs1 = map (T.breakOn ":") $ T.splitOn ";" f
+            furs :: [((Int, Maybe Int),Text)] -- (Index, Furigana reading)
+            furs = map (\(i,f) -> (rangeParse i, T.tail f)) furs1
+
+
+    (_, _) -> trace (Text.Pretty.Simple.pShowLightBg v) $ VocabT [Kana $ v ^. vocabKanaWriting]
+
+  where kw = v ^. vocabKanjiWriting
+        f = v ^. vocabFurigana
+
+rangeParse :: Text -> (Int,Maybe Int)
+rangeParse t =
+  case T.any ( == '-') t of
+    True -> (\(t1,t2) -> (maybe 0 identity $ readt t1, readt $ T.tail t2))
+      (T.breakOn "-" t)
+    False -> (maybe 0 identity $ readt t, Nothing)
+  where
+    readt t = readMaybe $ T.unpack t
+
+makeKanjiKana :: [((Int, Maybe Int),Text)] -> Text -> Int -> [KanjiOrKana]
+makeKanjiKana [] cs n
+  | T.null cs = []
+  | otherwise = [Kana cs]
+
+makeKanjiKana (((s, Just e),fur):fs) cs n =
+  if s > n
+    then
+      let
+        -- (kana, kanji + rest)
+        (ka, kn1) = T.splitAt (s-n) cs
+        -- (kanji, rest)
+        (kn, rest) = T.splitAt (e-s) kn1
+      in [Kana ka, (Kanji (KanjiT kn) fur)] ++ (makeKanjiKana fs rest (e + 1))
+
+    else
+      let
+        (kn, rest) = assert (s == n) $ T.splitAt (e-s) cs
+      in (Kanji (KanjiT kn) fur) : (makeKanjiKana fs rest (e + 1))
+
+makeKanjiKana (((s, Nothing), fur):fs) cs n =
+  if s > n
+    then
+      let
+        -- (kana, kanji + rest)
+        (ka, kn1) = T.splitAt (s-n) cs
+        -- (kanji, rest)
+        (kn, rest) = T.splitAt 1 kn1
+      in [Kana ka, (Kanji (KanjiT kn) fur)] ++ (makeKanjiKana fs rest (s + 1))
+
+    else
+      let
+        (kn, rest) = assert (s == n) $ T.splitAt 1 cs
+      in (Kanji (KanjiT kn) fur) : (makeKanjiKana fs rest (s + 1))

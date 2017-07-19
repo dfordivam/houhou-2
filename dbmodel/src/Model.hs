@@ -79,6 +79,8 @@ makeLenses ''VocabT
 type Vocab = VocabT Identity
 deriving instance Show Vocab
 deriving instance Show VocabId
+deriving instance Ord VocabId
+deriving instance Eq VocabId
 
 instance Table VocabT where
     data PrimaryKey VocabT f = VocabId (Columnar f (Auto Int)) deriving Generic
