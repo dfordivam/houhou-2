@@ -21,6 +21,8 @@ import qualified Data.ByteString.Lazy as BSL
 
 import Reflex.Dom.WebSocket.Monad
 import Reflex.Dom.WebSocket.Message
+import Reflex.Dom.SemanticUI
+
 data VisibleWidget = KanjiFilterVis | KanjiDetailPageVis
   deriving (Eq)
 
@@ -252,6 +254,22 @@ displayVocabT (VocabT ks) = do
         divClass "row" $ text t
   mapM_ f ks
 
-tshow = T.pack . show
 textMay (Just v) = text v
 textMay Nothing = text ""
+
+vocabSearchWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => WithWebSocketT Message.AppRequest t m ()
+vocabSearchWidget = divClass "ui internally celled grid" $ divClass "row" $ do
+
+  vocabResEv <- divClass "row" $ do
+    reading <- uiTextInput (constDyn def) def
+    meaning <- uiTextInput (constDyn def) def
+
+    let vsDyn = VocabSearch <$> (Filter
+                  <$> value reading
+                  <*> pure KunYomi
+                  <*> value meaning)
+    getWebSocketResponse (updated vsDyn)
+
+  void $ widgetHold (return ()) (vocabListWindow <$> vocabResEv)

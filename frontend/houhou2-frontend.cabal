@@ -51,6 +51,7 @@ executable         houhou2-frontend
                 , primitive
                 , reflex-dom-semui
                 , data-default
+                , lens
 
   if impl(ghcjs)
     build-depends: ghcjs-base
