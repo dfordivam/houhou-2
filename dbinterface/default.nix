@@ -1,6 +1,6 @@
 { mkDerivation, aeson, base, beam-core, beam-sqlite
-, bytestring-trie, containers, dbmodel, lens, protolude
-, sqlite-simple, stdenv, text, time
+, bytestring-trie, containers, dbmodel, lens, pretty-simple
+, protolude, sqlite-simple, stdenv, text, time
 }:
 mkDerivation {
   pname = "dbinterface";
@@ -8,7 +8,7 @@ mkDerivation {
   src = ./.;
   libraryHaskellDepends = [
     aeson base beam-core beam-sqlite bytestring-trie containers dbmodel
-    lens protolude sqlite-simple text time
+    lens pretty-simple protolude sqlite-simple text time
   ];
   homepage = "https://github.com/dfordivam/dbinterface#readme";
   license = stdenv.lib.licenses.unfree;

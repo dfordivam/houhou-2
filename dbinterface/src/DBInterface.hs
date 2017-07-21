@@ -17,6 +17,7 @@ module DBInterface
   , getRelatedVocab
   , getVocabMeaning
   , filterVocab
+  , getSrsEntries
   ) where
 
 import Model
@@ -225,3 +226,7 @@ filterVocab r m
     vs <- filterVocabByMeaning m
     vs2 <-filterVocabByReading r
     return $ Set.toList $ Set.intersection (Set.fromList vs) (Set.fromList vs2)
+
+getSrsEntries :: DBMonad [SrsEntry]
+getSrsEntries = do
+  selectListQuery (all_ (srsDbTable srsDb))

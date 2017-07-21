@@ -37,3 +37,4 @@ library
                      , text
                      , bytestring-trie
                      , time
+                     , pretty-simple

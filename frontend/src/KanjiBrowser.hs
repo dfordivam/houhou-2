@@ -260,7 +260,7 @@ textMay Nothing = text ""
 vocabSearchWidget
   :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => WithWebSocketT Message.AppRequest t m ()
-vocabSearchWidget = divClass "ui internally celled grid" $ divClass "row" $ do
+vocabSearchWidget = divClass "ui grid" $ divClass "row" $ do
 
   vocabResEv <- divClass "row" $ do
     reading <- uiTextInput (constDyn def) def
@@ -273,3 +273,82 @@ vocabSearchWidget = divClass "ui internally celled grid" $ divClass "row" $ do
     getWebSocketResponse (updated vsDyn)
 
   void $ widgetHold (return ()) (vocabListWindow <$> vocabResEv)
+
+srsWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => WithWebSocketT Message.AppRequest t m ()
+srsWidget =  divClass "ui grid" $ do
+
+  ev <- getPostBuild
+  statsEv <- getWebSocketResponse (GetSrsStats () <$ ev)
+
+  void $ widgetHold (return ()) (showStats <$> statsEv)
+
+showStats
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => SrsStats -> WithWebSocketT Message.AppRequest t m ()
+showStats s = do
+  divClass "ui grid row" $ do
+
+    startReview <- divClass "four wide centered column" $ do
+      divClass "two wide centered column" $
+        divClass "ui huge label" $
+          text $ tshow (pendingReviewCount s)
+      divClass "two wide centered column" $ do
+        divClass "ui grid centered row" $
+          divClass "ui large label" $
+            text "reviews pending"
+
+        divClass "ui grid centered row" $
+          uiButton (constDyn def) (text "Start reviewing")
+
+    statsCard "Reviews Today" (reviewsToday s)
+    statsCard "Total Items" (totalItems s)
+    statsCard "Total Reviews" (totalReviews s)
+    statsCard "Average Success" (averageSuccess s)
+
+  divClass "ui grid row" $ do
+    progressStatsCard "Discovering" "D1" "D2"
+      (discoveringCount s)
+    progressStatsCard "Committing" "C1" "C2"
+      (committingCount s)
+    progressStatsCard "Bolstering" "B1" "B2"
+      (bolsteringCount s)
+    progressStatsCard "Assimilating" "A1" "A2"
+      (assimilatingCount s)
+    divClass "three wide centered column" $ do
+      divClass "ui grid centered row" $
+        divClass "ui huge label" $
+          text $ tshow (setInStone s)
+      divClass "ui grid centered row" $
+        divClass "ui large label" $
+          text "Set in Stone"
+
+statsCard t val = divClass "three wide centered column" $ do
+  divClass "ui grid centered row" $
+    divClass "ui huge label" $
+      text $ tshow val
+  divClass "ui grid centered row" $
+    divClass "ui large label" $
+      text t
+
+progressStatsCard l l1 l2 (v1,v2) =
+  divClass "two wide centered column" $ do
+    divClass "ui grid centered row" $
+      divClass "ui huge label" $
+        text $ tshow (v1 + v2)
+    divClass "ui grid centered row" $
+      divClass "ui large label" $
+        text l
+    divClass "ui grid row" $ do
+      divClass "one wide centered column" $ do
+        divClass "ui grid centered row" $
+          divClass "ui label" $ text l1
+        divClass "ui grid centered row" $
+          divClass "ui label" $ text $ tshow v1
+
+      divClass "one wide centered column" $ do
+        divClass "ui grid centered row" $
+          divClass "ui label" $ text l2
+        divClass "ui grid centered row" $
+          divClass "ui label" $ text $ tshow v2

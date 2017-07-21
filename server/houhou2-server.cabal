@@ -46,6 +46,7 @@ library
                      , reflex-websocket-interface-shared
                      , reflex-websocket-interface-server
                      , pretty-simple
+                     , time
 
 test-suite unit
   type: exitcode-stdio-1.0

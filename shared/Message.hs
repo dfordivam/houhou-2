@@ -20,7 +20,13 @@ type AppRequest =
   :<|> LoadMoreKanjiResults
   :<|> GetKanjiDetails
   :<|> VocabSearch
+  :<|> GetSrsStats
+  :<|> BrowseSrsItems
+  :<|> GetNextReviewItem
+  :<|> DoReview
+  :<|> EditSrsItem
 
+----------------------------------------------------------------
 data KanjiFilter = KanjiFilter
   { textContent :: Text
   , filter :: Filter
@@ -34,6 +40,7 @@ instance Default KanjiFilter where
 instance WebSocketMessage AppRequest KanjiFilter where
   type ResponseT AppRequest KanjiFilter = KanjiFilterResult
 
+----------------------------------------------------------------
 data KanjiFilterResult =
   KanjiFilterResult KanjiList --
                     [RadicalId] -- Valid Radicals
@@ -46,6 +53,7 @@ data GetKanjiDetails =
 instance WebSocketMessage AppRequest GetKanjiDetails where
   type ResponseT AppRequest GetKanjiDetails = Maybe KanjiSelectionDetails
 
+----------------------------------------------------------------
 data KanjiSelectionDetails =
   KanjiSelectionDetails KanjiDetails
                         [VocabDispItem]
@@ -57,12 +65,70 @@ data LoadMoreKanjiResults = LoadMoreKanjiResults
 instance WebSocketMessage AppRequest LoadMoreKanjiResults where
   type ResponseT AppRequest LoadMoreKanjiResults = KanjiFilterResult
 
+----------------------------------------------------------------
 data VocabSearch = VocabSearch Filter
   deriving (Generic, Show)
 
 instance WebSocketMessage AppRequest VocabSearch where
   type ResponseT AppRequest VocabSearch = [VocabDispItem]
 
+----------------------------------------------------------------
+data GetSrsStats = GetSrsStats ()
+  deriving (Generic, Show)
+
+data SrsStats = SrsStats
+  { pendingReviewCount :: Int
+  , reviewsToday :: Int
+  , totalItems :: Int
+  , totalReviews :: Int
+  , averageSuccess :: Int
+  , discoveringCount :: (Int, Int)
+  , committingCount :: (Int, Int)
+  , bolsteringCount :: (Int, Int)
+  , assimilatingCount :: (Int, Int)
+  , setInStone :: Int
+  }
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest GetSrsStats where
+  type ResponseT AppRequest GetSrsStats = SrsStats
+
+----------------------------------------------------------------
+data BrowseSrsItems = BrowseSrsItems
+  deriving (Generic, Show)
+
+data SrsItems = SrsItems
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest BrowseSrsItems where
+  type ResponseT AppRequest BrowseSrsItems = SrsItems
+
+----------------------------------------------------------------
+data GetNextReviewItem = GetNextReviewItem
+  deriving (Generic, Show)
+
+data ReviewItem = ReviewItem
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest GetNextReviewItem where
+  type ResponseT AppRequest GetNextReviewItem = Maybe ReviewItem
+
+----------------------------------------------------------------
+data DoReview = DoReview
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest DoReview where
+  type ResponseT AppRequest DoReview = Maybe ReviewItem
+
+----------------------------------------------------------------
+data EditSrsItem = EditSrsItem
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest EditSrsItem where
+  type ResponseT AppRequest EditSrsItem = ()
+
+----------------------------------------------------------------
+----------------------------------------------------------------
 instance ToJSON KanjiSelectionDetails where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON KanjiSelectionDetails
@@ -86,3 +152,28 @@ instance FromJSON VocabSearch
 instance ToJSON LoadMoreKanjiResults where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON LoadMoreKanjiResults
+
+instance ToJSON GetSrsStats where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON GetSrsStats
+instance ToJSON SrsStats where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON SrsStats
+instance ToJSON BrowseSrsItems where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON BrowseSrsItems
+instance ToJSON SrsItems where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON SrsItems
+instance ToJSON GetNextReviewItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON GetNextReviewItem
+instance ToJSON ReviewItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON ReviewItem
+instance ToJSON DoReview where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON DoReview
+instance ToJSON EditSrsItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON EditSrsItem

@@ -27,10 +27,11 @@ topWidget
   => WithWebSocketT Message.AppRequest t m ()
 topWidget = divClass "ui container" $ do
   -- navigation with visibility control
-  tabDisplayUI "ui two item menu" "item active" "item" $
+  tabDisplayUI "ui three item menu" "item active" "item" $
     Map.fromList
-      [(1, ("Kanji", divClass "ui grid container" $ kanjiBrowseWidget))
-      , (2, ("Vocab", divClass "ui grid container" $ vocabSearchWidget))]
+      [(0, ("SRS", srsWidget))
+      ,(1, ("Kanji", kanjiBrowseWidget))
+      , (2, ("Vocab", vocabSearchWidget))]
 
 -- | A widget to construct a tabbed view that shows only one of its child widgets at a time.
 --   Creates a header bar containing a <ul> with one <li> per child; clicking a <li> displays

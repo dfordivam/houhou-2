@@ -8,7 +8,7 @@ module AppWebsocket where
 
 import Protolude
 import Handlers
-import DBInterface (openKanjiDB)
+import DBInterface (openKanjiDB, openSrsDB)
 
 import Control.Monad.RWS
 import Data.IORef
@@ -22,16 +22,18 @@ import Reflex.Dom.WebSocket.Server
 import qualified Database.SQLite.Simple as DB
 import qualified Message
 import Network.HTTP.Types.Status
+import qualified Data.Map as Map
 
 mainWebSocketHandler :: IO ()
 mainWebSocketHandler = do
   handlerStateRef <- newIORef $
-                     HandlerState [] 20
+                     HandlerState [] 20 Map.empty
   dbConn <- openKanjiDB
-  runEnv 3000 (app handlerStateRef dbConn)
+  srsDbConn <- openSrsDB
+  runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
 
 
-app :: IORef HandlerState -> DB.Connection -> Application
+app :: IORef HandlerState -> (DB.Connection, DB.Connection) -> Application
 app handlerStateRef dbConn =
   websocketsOr defaultConnectionOptions wsApp backupApp
   where
@@ -63,6 +65,11 @@ handler = HandlerWrapper $
   :<&> h getLoadMoreKanjiResults
   :<&> h getKanjiDetails
   :<&> h getVocabSearch
+  :<&> h getSrsStats
+  :<&> h getBrowseSrsItems
+  :<&> h getGetNextReviewItem
+  :<&> h getDoReview
+  :<&> h getEditSrsItem
 
   where
   h :: (WebSocketMessage Message.AppRequest a, Monad m)

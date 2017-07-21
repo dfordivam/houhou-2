@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 module Handlers where
 
 import Protolude hiding ((&))
@@ -14,19 +15,29 @@ import Common
 import DBInterface
 import Utils
 import qualified Data.Text as T
+import qualified Data.Map as Map
+import Data.Time.Clock
+import Data.Time.Calendar
 
-type HandlerM = RWST Connection () HandlerState IO
+type HandlerM = RWST (Connection,Connection) () HandlerState IO
 
 data HandlerState = HandlerState
   { _kanjiSearchResult :: [DB.Kanji]
   , _kanjiDisplayCount :: Int
+  , _srsEntries :: Map SrsEntryId SrsEntry
   }
 makeLenses ''HandlerState
 
-runDB :: (DBMonad a) -> HandlerM a
-runDB f = do
+runKanjiDB :: (DBMonad a) -> HandlerM a
+runKanjiDB f = do
   conn <- ask
-  res <- liftIO $ runReaderT f conn
+  res <- liftIO $ runReaderT f (fst conn)
+  return res
+
+runSrsDB :: (DBMonad a) -> HandlerM a
+runSrsDB f = do
+  conn <- ask
+  res <- liftIO $ runReaderT f (snd conn)
   return res
 
 -- Pagination,
@@ -85,8 +96,8 @@ getKanjiFilterResult (KanjiFilter inpTxt (Filter filtTxt filtType _) rads) = do
       | otherwise =
         getValidRadicalList $ map primaryKey kanjiList
 
-  kanjiList <- runDB fun
-  validRadicals <- runDB (getRadicals kanjiList)
+  kanjiList <- runKanjiDB fun
+  validRadicals <- runKanjiDB (getRadicals kanjiList)
   let
       kanjiResultCount = 20
   state
@@ -99,7 +110,7 @@ getKanjiFilterResult (KanjiFilter inpTxt (Filter filtTxt filtType _) rads) = do
         fmap primaryKey $ displayKanjiList
       displayKanjiListKIds = DB.getKeys displayKanjiListKeys
 
-  meanings <- runDB $
+  meanings <- runKanjiDB $
     mapM getKanjiMeaning $ displayKanjiListKeys
 
   let l = map convertKanji $
@@ -119,8 +130,8 @@ getLoadMoreKanjiResults = undefined
 
 getKanjiDetails :: GetKanjiDetails -> HandlerM (Maybe KanjiSelectionDetails)
 getKanjiDetails (GetKanjiDetails kId _) = do
-  ks <- runDB $ getKanji (makeKeys [kId])
-  m <- runDB $ getKanjiMeaning (makeKey $ Just kId)
+  ks <- runKanjiDB $ getKanji (makeKeys [kId])
+  m <- runKanjiDB $ getKanjiMeaning (makeKey $ Just kId)
   let
     kd = f <$> headMay ks
     f k =
@@ -142,7 +153,7 @@ getKanjiDetails (GetKanjiDetails kId _) = do
                 (JlptLevelT <$> v ^. vocabJlptLevel)
                 (WkLevelT <$> v ^. vocabWkLevel)
                 (WikiRank <$> v ^. vocabWikiRank)
-  vs <- runDB $ mapM f =<< getVocab =<< getRelatedVocab (map primaryKey ks)
+  vs <- runKanjiDB $ mapM f =<< getVocab =<< getRelatedVocab (map primaryKey ks)
   return $ KanjiSelectionDetails <$> kd <*> pure vs
 
 getVocabSearch :: VocabSearch -> HandlerM [VocabDispItem]
@@ -155,4 +166,44 @@ getVocabSearch (VocabSearch (Filter r _ m)) = do
                 (JlptLevelT <$> v ^. vocabJlptLevel)
                 (WkLevelT <$> v ^. vocabWkLevel)
                 (WikiRank <$> v ^. vocabWikiRank)
-  runDB $ mapM f =<<  getVocab =<< filterVocab r m
+  runKanjiDB $ mapM f =<<  getVocab =<< filterVocab r m
+
+getSrsStats :: GetSrsStats -> HandlerM SrsStats
+getSrsStats _ = do
+  srsEntries <- gets (_srsEntries)
+  srsEntries <- if (null srsEntries)
+    then runSrsDB $ getSrsEntries
+    else return $ map snd $ Map.toList srsEntries
+
+  curTime <- liftIO getCurrentTime
+
+  let
+    today = utctDay curTime
+    tomorrow = addDays 1 today
+    countGrade g = length $ Protolude.filter (\s -> s ^. srsEntryCurrentGrade == g) srsEntries
+    pendingReviewCount = length $ Protolude.filter  (\s -> isJust $ (<) curTime <$> (s ^. srsEntryNextAnswerDate))
+      srsEntries
+    reviewsToday = length $ Protolude.filter (\s -> isJust $ (<) tomorrow <$> (utctDay <$> (s ^. srsEntryNextAnswerDate)))
+      srsEntries
+    totalItems = length srsEntries
+    totalReviews = sum $ map (\s -> s ^. srsEntrySuccessCount + s ^. srsEntryFailureCount) srsEntries
+    averageSuccess = floor $ ((fromIntegral ((sum $ map _srsEntrySuccessCount srsEntries)*100)) / (fromIntegral totalReviews))
+    discoveringCount = (countGrade 0, countGrade 1)
+    committingCount = (countGrade 2, countGrade 3)
+    bolsteringCount = (countGrade 4, countGrade 5)
+    assimilatingCount = (countGrade 6, countGrade 7)
+    setInStone = countGrade 8
+  return SrsStats {..}
+
+getBrowseSrsItems      :: BrowseSrsItems
+  -> HandlerM SrsItems
+getBrowseSrsItems = undefined
+getGetNextReviewItem   :: GetNextReviewItem
+  -> HandlerM (Maybe ReviewItem)
+getGetNextReviewItem = undefined
+getDoReview            :: DoReview
+  -> HandlerM (Maybe ReviewItem)
+getDoReview = undefined
+getEditSrsItem         :: EditSrsItem
+  -> HandlerM ()
+getEditSrsItem = undefined
