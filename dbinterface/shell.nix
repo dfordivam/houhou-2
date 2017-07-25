@@ -11,7 +11,8 @@ let
   beam-sqlite = ghc.callPackage ~/repos/beam/beam-sqlite {inherit beam-core beam-migrate;};
   drv = ghc.callPackage ./default.nix {
     inherit beam-core beam-sqlite;
-    dbmodel = ghc.callPackage ../dbmodel {inherit beam-core beam-sqlite;};
+    dbmodel = ghc.callPackage (ghc.haskellSrc2nix {name = "dbmodel"; src=
+    ../dbmodel;} ) {inherit beam-core beam-sqlite;};
     };
 
 in

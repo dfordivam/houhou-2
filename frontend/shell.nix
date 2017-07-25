@@ -1,6 +1,6 @@
 { nixpkgs ? import <nixpkgs> {}
 , reflex-platform ? import ../reflex-platform {}
-, ghc ? reflex-platform.ghcjs }:
+, ghc ? reflex-platform.ghc }:
 
 let
 
@@ -12,7 +12,8 @@ let
 
   drv = ghc.callPackage ./default.nix {
     inherit reflex-websocket-interface-shared reflex-websocket-interface reflex-dom-semui;
-    houhou2-shared = ghc.callPackage ../shared {inherit reflex-websocket-interface-shared;};
+    houhou2-shared = ghc.callPackage (ghc.haskellSrc2nix {name =
+    "houhou2-shared"; src = ../shared; }) {inherit reflex-websocket-interface-shared;};
     };
 
 in
