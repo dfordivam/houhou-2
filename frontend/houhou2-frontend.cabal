@@ -52,6 +52,7 @@ executable         houhou2-frontend
                 , reflex-dom-semui
                 , data-default
                 , lens
+                , time
 
   if impl(ghcjs)
     build-depends: ghcjs-base

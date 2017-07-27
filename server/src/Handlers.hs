@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Handlers where
 
 import Protolude hiding ((&))
@@ -170,24 +171,27 @@ getVocabSearch (VocabSearch (Filter r _ m)) = do
 
 getSrsStats :: GetSrsStats -> HandlerM SrsStats
 getSrsStats _ = do
-  srsEntries <- gets (_srsEntries)
-  srsEntries <- if (null srsEntries)
-    then runSrsDB $ getSrsEntries
-    else return $ map snd $ Map.toList srsEntries
+  srsEsMap <- gets (_srsEntries)
+  srsEs <- if (null srsEsMap)
+    then do
+      ss <- runSrsDB $ getSrsEntries
+      modify (set srsEntries (Map.fromList $ map (\s-> (primaryKey s, s)) ss))
+      return ss
+    else return $ map snd $ Map.toList srsEsMap
 
   curTime <- liftIO getCurrentTime
 
   let
     today = utctDay curTime
     tomorrow = addDays 1 today
-    countGrade g = length $ Protolude.filter (\s -> s ^. srsEntryCurrentGrade == g) srsEntries
+    countGrade g = length $ Protolude.filter (\s -> s ^. srsEntryCurrentGrade == g) srsEs
     pendingReviewCount = length $ Protolude.filter  (\s -> isJust $ (<) curTime <$> (s ^. srsEntryNextAnswerDate))
-      srsEntries
+      srsEs
     reviewsToday = length $ Protolude.filter (\s -> isJust $ (<) tomorrow <$> (utctDay <$> (s ^. srsEntryNextAnswerDate)))
-      srsEntries
-    totalItems = length srsEntries
-    totalReviews = sum $ map (\s -> s ^. srsEntrySuccessCount + s ^. srsEntryFailureCount) srsEntries
-    averageSuccess = floor $ ((fromIntegral ((sum $ map _srsEntrySuccessCount srsEntries)*100)) / (fromIntegral totalReviews))
+      srsEs
+    totalItems = length srsEs
+    totalReviews = sum $ map (\s -> s ^. srsEntrySuccessCount + s ^. srsEntryFailureCount) srsEs
+    averageSuccess = floor $ ((fromIntegral ((sum $ map _srsEntrySuccessCount srsEs)*100)) / (fromIntegral totalReviews))
     discoveringCount = (countGrade 0, countGrade 1)
     committingCount = (countGrade 2, countGrade 3)
     bolsteringCount = (countGrade 4, countGrade 5)
@@ -196,8 +200,24 @@ getSrsStats _ = do
   return SrsStats {..}
 
 getBrowseSrsItems      :: BrowseSrsItems
-  -> HandlerM SrsItems
-getBrowseSrsItems = undefined
+  -> HandlerM [SrsItem]
+getBrowseSrsItems (BrowseSrsItems lvls) = do
+  srsEsMap <- gets (_srsEntries)
+  let res = Map.elems $ Map.filter
+        (\s -> elem (s ^. srsEntryCurrentGrade) lvls)
+        srsEsMap
+      f s = SrsItem <$> (getKey $ primaryKey s) <*> v
+        <*> pure (s ^. srsEntryCurrentGrade)
+        where
+          v = case (s ^. srsEntryAssociatedKanji,
+                   s ^. srsEntryAssociatedVocab) of
+                ((Just k), _) -> Just $ Right $ KanjiT k
+                (_, (Just v)) -> Just $ Left $
+                  VocabT $ [Kana v]
+                _ -> Nothing
+
+  return $ catMaybes $ map f res
+
 getGetNextReviewItem   :: GetNextReviewItem
   -> HandlerM (Maybe ReviewItem)
 getGetNextReviewItem = undefined
@@ -207,3 +227,6 @@ getDoReview = undefined
 getEditSrsItem         :: EditSrsItem
   -> HandlerM ()
 getEditSrsItem = undefined
+getBulkEditSrsItems :: BulkEditSrsItems
+  -> HandlerM ()
+getBulkEditSrsItems = undefined

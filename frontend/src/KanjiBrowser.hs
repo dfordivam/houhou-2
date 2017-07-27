@@ -1,8 +1,9 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module KanjiBrowser where
 
-import Protolude hiding (link)
+import Protolude hiding (link, (&))
 import Reflex.Dom
 import Message
 import Common
@@ -22,6 +23,7 @@ import qualified Data.ByteString.Lazy as BSL
 import Reflex.Dom.WebSocket.Monad
 import Reflex.Dom.WebSocket.Message
 import Reflex.Dom.SemanticUI
+import Data.Time.Clock
 
 data VisibleWidget = KanjiFilterVis | KanjiDetailPageVis
   deriving (Eq)
@@ -279,18 +281,24 @@ srsWidget
   => WithWebSocketT Message.AppRequest t m ()
 srsWidget =  divClass "ui grid" $ do
 
-  ev <- getPostBuild
-  statsEv <- getWebSocketResponse (GetSrsStats () <$ ev)
-
-  void $ widgetHold (return ()) (showStats <$> statsEv)
+  showStats
+  browseSrsItemsWidget
+  return ()
 
 showStats
   :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
-  => SrsStats -> WithWebSocketT Message.AppRequest t m ()
-showStats s = do
-  divClass "ui grid row" $ do
+  => WithWebSocketT Message.AppRequest t m ()
+showStats = do
+  ev <- getPostBuild
+  s <- getWebSocketResponse (GetSrsStats () <$ ev)
+  void $ widgetHold (return ()) (showStatsWidget <$> s)
 
-    startReview <- divClass "four wide centered column" $ do
+showStatsWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => SrsStats -> m ()
+showStatsWidget s = do
+  startReview <- divClass "ui grid row" $ do
+    ev <- divClass "four wide centered column" $ do
       divClass "two wide centered column" $
         divClass "ui huge label" $
           text $ tshow (pendingReviewCount s)
@@ -306,6 +314,7 @@ showStats s = do
     statsCard "Total Items" (totalItems s)
     statsCard "Total Reviews" (totalReviews s)
     statsCard "Average Success" (averageSuccess s)
+    return ev
 
   divClass "ui grid row" $ do
     progressStatsCard "Discovering" "D1" "D2"
@@ -323,6 +332,9 @@ showStats s = do
       divClass "ui grid centered row" $
         divClass "ui large label" $
           text "Set in Stone"
+
+  browseEv <- uiButton (constDyn def) (text "Browse Srs Items")
+  return ()
 
 statsCard t val = divClass "three wide centered column" $ do
   divClass "ui grid centered row" $
@@ -352,3 +364,111 @@ progressStatsCard l l1 l2 (v1,v2) =
           divClass "ui label" $ text l2
         divClass "ui grid centered row" $
           divClass "ui label" $ text $ tshow v2
+
+-- Fetch all srs items then apply the filter client side
+-- fetch srs items for every change in filter
+--
+browseSrsItemsWidget
+  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  => WithWebSocketT Message.AppRequest t m ()
+browseSrsItemsWidget = do
+
+  -- ev <- getPostBuild
+  -- initItemList <- getWebSocketResponse $ BrowseSrsItems [0] <$ ev
+
+  let
+    srsLevels :: _ => [(SrsLevel, DropdownItemConfig m)]
+    srsLevels = map (\g -> (g, DropdownItemConfig (tshow g) (text $ tshow g))) [0..8]
+
+
+  -- UI
+  divClass "ui grid row" $ do
+    -- Filter Options
+    (filteredList, selectAllToggleCheckBox) <-
+      divClass "ui grid row" $ do
+        -- Selection buttons
+        selectAllToggleCheckBox <- divClass "two wide column centered" $ do
+
+          uiCheckbox (text "Select All") $
+            def -- & setValue .~ allSelected
+
+        -- Level
+        -- (levels :: Dynamic t [SrsLevel])
+        levels
+          <- divClass "four wide column centered" $
+             divClass "field" $ el "label" $
+               uiDropdownMulti srsLevels [DOFSelection] $
+                 def & dropdownConf_initialValue .~ []
+
+         -- Kanji/Vocab
+         -- Pending review
+
+        filteredList <- getWebSocketResponse $
+          BrowseSrsItems <$> updated levels
+        return (filteredList, selectAllToggleCheckBox)
+
+    let
+      -- itemEv :: Event t [SrsItem]
+      -- initItemList = never
+      itemEv = filteredList -- leftmost [initItemList, filteredList]
+
+      checkBoxSelAllEv = updated $
+        value selectAllToggleCheckBox
+
+      checkBoxList es =
+        divClass "eight wide column centered" $ do
+          el "label" $ text "Select Items to do bulk edit"
+          evs <- elAttr "div" (("class" =: "ui list")
+                               <> ("style" =: "height: 400px; overflow-y: scroll")) $
+            forM es checkBoxEl
+
+          let f (v, True) s = Set.insert v s
+              f (v, False) s = Set.delete v s
+          selList <- foldDyn f Set.empty (leftmost evs)
+
+          return $ Set.toList <$> selList
+
+      f (Left (VocabT ((Kana k):_))) = k
+      f (Right (KanjiT k)) = k
+      checkBoxEl (SrsItem i v _) = divClass "item" $ do
+        c1 <- uiCheckbox (text $ f v) $
+          def & setValue .~ checkBoxSelAllEv
+        return $ (,) i <$> updated (value c1)
+
+    -- List and selection checkBox
+    selList <- divClass "ui grid row" $ do
+      widgetHold (checkBoxList []) (checkBoxList <$> itemEv)
+
+    -- Action buttons
+    selList <- divClass "ui grid row" $ do
+
+      suspendEv <- divClass "two wide column centered" $
+        uiButton (constDyn def) (text "Suspend")
+
+      deleteEv <- divClass "two wide column centered" $
+        uiButton (constDyn def) (text "Delete")
+
+      changeLvlSel <- divClass "two wide column centered" $
+        uiDropdown srsLevels [DOFSelection] $
+          def & dropdownConf_initialValue .~ Just 0
+      changeLvlDyn <- foldDynMaybe const 0 $
+        updated changeLvlSel
+      changeLvlEv <- divClass "two wide column centered" $
+        uiButton (constDyn def) (text "Change Level")
+
+      reviewDateChange <- divClass "two wide column centered" $
+        uiButton (constDyn def) (text "Change Review Date")
+
+      reviewDate <- liftIO getCurrentTime
+      let bEditOp = leftmost
+            [DeleteSrsItems <$ deleteEv
+            , SuspendSrsItems <$ suspendEv
+            , ChangeSrsLevel <$> tagPromptlyDyn changeLvlDyn changeLvlEv
+            , ChangeSrsReviewData reviewDate
+              <$ reviewDateChange]
+      getWebSocketResponse $ uncurry BulkEditSrsItems <$>
+        (attachDyn (join selList) bEditOp)
+
+    void $ divClass "ui row" $
+      uiButton (constDyn def) (text "Close Widget")
+  return ()

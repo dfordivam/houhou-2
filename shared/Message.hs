@@ -25,6 +25,7 @@ type AppRequest =
   :<|> GetNextReviewItem
   :<|> DoReview
   :<|> EditSrsItem
+  :<|> BulkEditSrsItems
 
 ----------------------------------------------------------------
 data KanjiFilter = KanjiFilter
@@ -94,14 +95,14 @@ instance WebSocketMessage AppRequest GetSrsStats where
   type ResponseT AppRequest GetSrsStats = SrsStats
 
 ----------------------------------------------------------------
-data BrowseSrsItems = BrowseSrsItems
+data BrowseSrsItems = BrowseSrsItems [SrsLevel]
   deriving (Generic, Show)
 
 data SrsItems = SrsItems
   deriving (Generic, Show)
 
 instance WebSocketMessage AppRequest BrowseSrsItems where
-  type ResponseT AppRequest BrowseSrsItems = SrsItems
+  type ResponseT AppRequest BrowseSrsItems = [SrsItem]
 
 ----------------------------------------------------------------
 data GetNextReviewItem = GetNextReviewItem
@@ -128,6 +129,12 @@ instance WebSocketMessage AppRequest EditSrsItem where
   type ResponseT AppRequest EditSrsItem = ()
 
 ----------------------------------------------------------------
+data BulkEditSrsItems = BulkEditSrsItems [SrsItemId] BulkEditOperation
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest BulkEditSrsItems where
+  type ResponseT AppRequest BulkEditSrsItems = ()
+
 ----------------------------------------------------------------
 instance ToJSON KanjiSelectionDetails where
   toEncoding = genericToEncoding defaultOptions
@@ -177,3 +184,7 @@ instance FromJSON DoReview
 instance ToJSON EditSrsItem where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON EditSrsItem
+
+instance ToJSON BulkEditSrsItems where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON BulkEditSrsItems

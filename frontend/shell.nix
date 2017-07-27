@@ -1,6 +1,6 @@
 { nixpkgs ? import <nixpkgs> {}
 , reflex-platform ? import ../reflex-platform {}
-, ghc ? reflex-platform.ghc }:
+, ghc ? reflex-platform.ghcjs }:
 
 let
 

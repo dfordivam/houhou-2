@@ -70,6 +70,7 @@ handler = HandlerWrapper $
   :<&> h getGetNextReviewItem
   :<&> h getDoReview
   :<&> h getEditSrsItem
+  :<&> h getBulkEditSrsItems
 
   where
   h :: (WebSocketMessage Message.AppRequest a, Monad m)

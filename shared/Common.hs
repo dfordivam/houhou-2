@@ -9,6 +9,7 @@ import Protolude
 -- import GHC.Generics
 import Data.Aeson
 import Data.Default
+import Data.Time (UTCTime)
 
 -- import Data.Text
 
@@ -100,6 +101,43 @@ data KanjiOrKana
 
 type VocabCategory = Text
 
+-- SRS Data
+
+-- data SrsEntryT f = SrsEntry {
+--     _srsEntryId               :: C f (Auto Int)
+--   , _srsEntryCreationDate     :: C f (UTCTime)
+--   , _srsEntryNextAnswerDate   :: C f (Maybe UTCTime)
+--   , _srsEntryMeanings         :: C f (Text)
+--   , _srsEntryReadings         :: C f (Text)
+--   , _srsEntryCurrentGrade     :: C f (Int)
+--   , _srsEntryFailureCount     :: C f (Int)
+--   , _srsEntrySuccessCount     :: C f (Int)
+--   , _srsEntryAssociatedVocab  :: C f (Maybe Text)
+--   , _srsEntryAssociatedKanji  :: C f (Maybe Text)
+--   , _srsEntryMeaningNote      :: C f (Maybe Text)
+--   , _srsEntryReadingNote      :: C f (Maybe Text)
+--   , _srsEntrySuspensionDate   :: C f (Maybe UTCTime)
+--   , _srsEntryTags             :: C f (Maybe Text)
+--   , _srsEntryLastUpdateDate   :: C f (Maybe UTCTime)
+--   , _srsEntryIsDeleted        :: C f (Bool)
+
+type SrsLevel = Int
+type SrsItemId = Int
+data SrsItem = SrsItem
+ {
+   srsItemId :: SrsItemId
+ , srsVocabOrKanji :: Either VocabT KanjiT
+ , srsLevel :: SrsLevel
+ }
+  deriving (Generic, Show)
+
+data BulkEditOperation
+  = SuspendSrsItems
+  | ChangeSrsLevel SrsLevel
+  | ChangeSrsReviewData UTCTime
+  | DeleteSrsItems
+  deriving (Generic, Show)
+
 -- Instance declarations
 instance ToJSON KanjiT where
   toEncoding = genericToEncoding defaultOptions
@@ -169,3 +207,9 @@ instance FromJSON Filter
 instance ToJSON ReadingType where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON ReadingType
+instance ToJSON BulkEditOperation where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON BulkEditOperation
+instance ToJSON SrsItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON SrsItem
