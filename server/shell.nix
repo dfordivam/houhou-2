@@ -22,7 +22,9 @@ let
   reflex-websocket-interface-shared = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/shared {};
   reflex-websocket-interface-server = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/server {inherit reflex-websocket-interface-shared;};
 
-  drv = ghc.callPackage ./default.nix {
+  drv = ghc.callPackage (ghc.haskellSrc2nix
+  {name = "houhou2-server";
+  src = ./.;}) {
     inherit dbmodel dbinterface houhou2-shared reflex-websocket-interface-shared reflex-websocket-interface-server pretty-simple;
     };
 
