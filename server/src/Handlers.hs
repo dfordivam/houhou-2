@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module Handlers where
 
 import Protolude hiding ((&))
@@ -19,6 +20,7 @@ import qualified Data.Text as T
 import qualified Data.Map as Map
 import Data.Time.Clock
 import Data.Time.Calendar
+import Text.Pretty.Simple
 
 type HandlerM = RWST (Connection,Connection) () HandlerState IO
 
@@ -203,11 +205,24 @@ getBrowseSrsItems      :: BrowseSrsItems
   -> HandlerM [SrsItem]
 getBrowseSrsItems (BrowseSrsItems lvls) = do
   srsEsMap <- gets (_srsEntries)
-  let res = Map.elems $ Map.filter
-        (\s -> elem (s ^. srsEntryCurrentGrade) lvls)
+  srsEs <- if (null srsEsMap)
+    then do
+      ss <- runSrsDB $ getSrsEntries
+      modify (set srsEntries (Map.fromList $ map (\s-> (primaryKey s, s)) ss))
+      return ss
+    else return $ map snd $ Map.toList srsEsMap
+  srsEsMap <- gets (_srsEntries)
+  curTime <- liftIO getCurrentTime
+
+  let res = Map.elems $
+        Map.filter
+          (\s -> not (s ^. srsEntryIsDeleted)) $
+        Map.filter
+          (\s -> elem (s ^. srsEntryCurrentGrade) lvls)
         srsEsMap
       f s = SrsItem <$> (getKey $ primaryKey s) <*> v
-        <*> pure (s ^. srsEntryCurrentGrade)
+        <*> pure (isJust $ s ^. srsEntrySuspensionDate)
+        <*> p (s ^. srsEntryNextAnswerDate)
         where
           v = case (s ^. srsEntryAssociatedKanji,
                    s ^. srsEntryAssociatedVocab) of
@@ -215,8 +230,14 @@ getBrowseSrsItems (BrowseSrsItems lvls) = do
                 (_, (Just v)) -> Just $ Left $
                   VocabT $ [Kana v]
                 _ -> Nothing
+          p Nothing = Just False
+          p (Just d) = Just (d < curTime)
 
-  return $ catMaybes $ map f res
+  liftIO $ pPrint res
+  let r = catMaybes $ map f res
+  liftIO $ pPrint r
+
+  return $ r
 
 getGetNextReviewItem   :: GetNextReviewItem
   -> HandlerM (Maybe ReviewItem)
@@ -227,6 +248,32 @@ getDoReview = undefined
 getEditSrsItem         :: EditSrsItem
   -> HandlerM ()
 getEditSrsItem = undefined
+
 getBulkEditSrsItems :: BulkEditSrsItems
-  -> HandlerM ()
-getBulkEditSrsItems = undefined
+  -> HandlerM [SrsItem]
+getBulkEditSrsItems (BulkEditSrsItems ss op filt) = do
+  srsEsMap <- gets (_srsEntries)
+  curTime <- liftIO getCurrentTime
+
+  case op of
+    SuspendSrsItems -> do
+      let
+        f :: Map SrsEntryId SrsEntry -> SrsItemId -> HandlerM (Map SrsEntryId SrsEntry)
+        f sMap sId = do
+          let
+            sIdK = (makeKey $ Just sId)
+            s = Map.lookup sIdK sMap
+            sNew = s & _Just . srsEntrySuspensionDate
+              .~ Just curTime
+            sMap' = Map.update (const sNew) sIdK sMap
+          mapM runSrsDB (updateSrsEntry <$> sNew)
+          return sMap'
+
+      nMap <- foldlM f srsEsMap ss
+      modify (set srsEntries nMap)
+
+    ChangeSrsLevel l -> undefined
+    ChangeSrsReviewData d -> undefined
+    DeleteSrsItems -> undefined
+
+  getBrowseSrsItems filt

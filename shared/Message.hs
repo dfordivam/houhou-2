@@ -129,11 +129,11 @@ instance WebSocketMessage AppRequest EditSrsItem where
   type ResponseT AppRequest EditSrsItem = ()
 
 ----------------------------------------------------------------
-data BulkEditSrsItems = BulkEditSrsItems [SrsItemId] BulkEditOperation
+data BulkEditSrsItems = BulkEditSrsItems [SrsItemId] BulkEditOperation BrowseSrsItems
   deriving (Generic, Show)
 
 instance WebSocketMessage AppRequest BulkEditSrsItems where
-  type ResponseT AppRequest BulkEditSrsItems = ()
+  type ResponseT AppRequest BulkEditSrsItems = [SrsItem]
 
 ----------------------------------------------------------------
 instance ToJSON KanjiSelectionDetails where

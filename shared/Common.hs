@@ -127,7 +127,8 @@ data SrsItem = SrsItem
  {
    srsItemId :: SrsItemId
  , srsVocabOrKanji :: Either VocabT KanjiT
- , srsLevel :: SrsLevel
+ , srsItemSuspended :: Bool
+ , srsItemPendingReview :: Bool
  }
   deriving (Generic, Show)
 

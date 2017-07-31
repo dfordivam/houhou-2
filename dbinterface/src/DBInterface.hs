@@ -18,6 +18,7 @@ module DBInterface
   , getVocabMeaning
   , filterVocab
   , getSrsEntries
+  , updateSrsEntry
   ) where
 
 import Model
@@ -228,5 +229,13 @@ filterVocab r m
     return $ Set.toList $ Set.intersection (Set.fromList vs) (Set.fromList vs2)
 
 getSrsEntries :: DBMonad [SrsEntry]
-getSrsEntries = do
-  selectListQuery (all_ (srsDbTable srsDb))
+getSrsEntries = selectListQuery (all_ (srsDbTable srsDb))
+
+updateSrsEntry ::
+  SrsEntry -> DBMonad ()
+updateSrsEntry s = do
+  conn <- ask
+  liftIO $
+    void $ withDatabaseDebug putStrLn conn $
+      runUpdate $
+        save (srsDbTable srsDb) s

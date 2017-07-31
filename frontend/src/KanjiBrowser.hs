@@ -384,7 +384,7 @@ browseSrsItemsWidget = do
   -- UI
   divClass "ui grid row" $ do
     -- Filter Options
-    (filteredList, selectAllToggleCheckBox) <-
+    (browseSrsFilterEv, selectAllToggleCheckBox) <-
       divClass "ui grid row" $ do
         -- Selection buttons
         selectAllToggleCheckBox <- divClass "two wide column centered" $ do
@@ -403,10 +403,10 @@ browseSrsItemsWidget = do
          -- Kanji/Vocab
          -- Pending review
 
-        filteredList <- getWebSocketResponse $
-          BrowseSrsItems <$> updated levels
-        return (filteredList, selectAllToggleCheckBox)
+        return (BrowseSrsItems <$> updated levels, selectAllToggleCheckBox)
 
+    filteredList <- getWebSocketResponse browseSrsFilterEv
+    browseSrsFilterDyn <- holdDyn (BrowseSrsItems []) browseSrsFilterEv
     let
       -- itemEv :: Event t [SrsItem]
       -- initItemList = never
@@ -428,9 +428,10 @@ browseSrsItemsWidget = do
 
           return $ Set.toList <$> selList
 
-      f (Left (VocabT ((Kana k):_))) = k
-      f (Right (KanjiT k)) = k
-      checkBoxEl (SrsItem i v _) = divClass "item" $ do
+      checkBoxEl (SrsItem i v _ _) = divClass "item" $ do
+        let
+          f (Left (VocabT ((Kana k):_))) = k
+          f (Right (KanjiT k)) = k
         c1 <- uiCheckbox (text $ f v) $
           def & setValue .~ checkBoxSelAllEv
         return $ (,) i <$> updated (value c1)
@@ -466,8 +467,8 @@ browseSrsItemsWidget = do
             , ChangeSrsLevel <$> tagPromptlyDyn changeLvlDyn changeLvlEv
             , ChangeSrsReviewData reviewDate
               <$ reviewDateChange]
-      getWebSocketResponse $ uncurry BulkEditSrsItems <$>
-        (attachDyn (join selList) bEditOp)
+      getWebSocketResponse $ (\((s,b),e) -> BulkEditSrsItems s e b) <$>
+        (attachDyn ((,) <$> (join selList) <*> browseSrsFilterDyn) bEditOp)
 
     void $ divClass "ui row" $
       uiButton (constDyn def) (text "Close Widget")

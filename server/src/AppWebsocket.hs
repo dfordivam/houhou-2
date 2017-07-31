@@ -52,7 +52,7 @@ app handlerStateRef dbConn =
       (resp, newState, _) <- runRWST rwst dbConn hState
       writeIORef handlerStateRef newState
 
-      -- print resp
+      print resp
       sendBinaryData conn resp
       loop conn
 

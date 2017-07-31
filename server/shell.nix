@@ -12,8 +12,11 @@ let
   beam-sqlite = ghc.callPackage ~/repos/beam/beam-sqlite {inherit beam-core beam-migrate;};
   dbmodel = ghc.callPackage (ghc.haskellSrc2nix {name =
       "dbmodel"; src = ../dbmodel;}) {inherit beam-core beam-sqlite;};
-  dbinterface = ghc.callPackage (ghc.haskellSrc2nix {name =
-      "dbinterface"; src = ../dbinterface; }) {inherit beam-core beam-sqlite dbmodel;};
+  dbinterface = ghc.callPackage
+    (ghc.haskellSrc2nix {name =
+      "dbinterface"; src = ../dbinterface; })
+    #../dbinterface
+      {inherit beam-core beam-sqlite dbmodel;};
 
   houhou2-shared = ghc.callPackage (ghc.haskellSrc2nix {name =
       "houhou2-shared"; src = ../shared; })
