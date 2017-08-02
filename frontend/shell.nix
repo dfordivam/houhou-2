@@ -10,7 +10,9 @@ let
   reflex-websocket-interface = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/reflex {inherit reflex-websocket-interface-shared;};
   reflex-dom-semui = nixpkgs.haskell.lib.dontCheck (ghc.callPackage ~/repos/reflex/reflex-dom-semui {});
 
-  drv = ghc.callPackage ./default.nix {
+  drv = ghc.callPackage (ghc.haskellSrc2nix
+  {name = "houhou2-frontend";
+  src = ./.;}) {
     inherit reflex-websocket-interface-shared reflex-websocket-interface reflex-dom-semui;
     houhou2-shared = ghc.callPackage (ghc.haskellSrc2nix {name =
     "houhou2-shared"; src = ../shared; }) {inherit reflex-websocket-interface-shared;};

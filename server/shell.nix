@@ -7,6 +7,7 @@ let
   inherit (nixpkgs) pkgs;
 
   pretty-simple = ghc.callPackage ~/repos/pretty-simple        {};
+
   beam-core = ghc.callPackage ~/repos/beam/beam-core        {};
   beam-migrate = ghc.callPackage ~/repos/beam/beam-migrate {inherit beam-core;};
   beam-sqlite = ghc.callPackage ~/repos/beam/beam-sqlite {inherit beam-core beam-migrate;};
