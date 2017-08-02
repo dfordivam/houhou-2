@@ -263,8 +263,7 @@ getBulkEditSrsItems (BulkEditSrsItems ss op filt) = do
           let
             sIdK = (makeKey $ Just sId)
             s = Map.lookup sIdK sMap
-            sNew = s & _Just . srsEntrySuspensionDate
-              .~ Just curTime
+            sNew = s & _Just . srsEntrySuspensionDate ?~ curTime
             sMap' = Map.update (const sNew) sIdK sMap
           mapM runSrsDB (updateSrsEntry <$> sNew)
           return sMap'
@@ -272,8 +271,74 @@ getBulkEditSrsItems (BulkEditSrsItems ss op filt) = do
       nMap <- foldlM f srsEsMap ss
       modify (set srsEntries nMap)
 
-    ChangeSrsLevel l -> undefined
-    ChangeSrsReviewData d -> undefined
-    DeleteSrsItems -> undefined
+    ResumeSrsItems -> do
+      let
+        f :: Map SrsEntryId SrsEntry -> SrsItemId -> HandlerM (Map SrsEntryId SrsEntry)
+        f sMap sId = do
+          let
+            sIdK = (makeKey $ Just sId)
+            s = Map.lookup sIdK sMap
+            -- s must be already suspended and has a valid review date
+            -- Add check for grade <8 ??
+            reviewDate :: Maybe UTCTime
+            reviewDate = g <$> (s ^? _Just . srsEntrySuspensionDate . _Just)
+              <*> (s ^? _Just . srsEntryNextAnswerDate . _Just)
+            g susDate prevReviewDate = if susDate > prevReviewDate
+              then curTime
+              else addUTCTime (diffUTCTime prevReviewDate susDate) curTime
+            sNew :: Maybe SrsEntry
+            sNew = join $ (\r -> s & _Just . srsEntrySuspensionDate .~ Nothing
+                     & _Just . srsEntryNextAnswerDate ?~ r) <$> reviewDate
+            sMap' = maybe sMap identity ((\n -> Map.update (const (Just n)) sIdK sMap) <$> sNew)
+          mapM runSrsDB (updateSrsEntry <$> sNew)
+          return sMap'
+
+      nMap <- foldlM f srsEsMap ss
+      modify (set srsEntries nMap)
+
+    ChangeSrsLevel l -> do
+      let
+        f :: Map SrsEntryId SrsEntry -> SrsItemId -> HandlerM (Map SrsEntryId SrsEntry)
+        f sMap sId = do
+          let
+            sIdK = (makeKey $ Just sId)
+            s = Map.lookup sIdK sMap
+            sNew = s & _Just . srsEntryCurrentGrade .~ l
+            sMap' = Map.update (const sNew) sIdK sMap
+          mapM runSrsDB (updateSrsEntry <$> sNew)
+          return sMap'
+
+      nMap <- foldlM f srsEsMap ss
+      modify (set srsEntries nMap)
+
+    ChangeSrsReviewData d -> do
+      let
+        f :: Map SrsEntryId SrsEntry -> SrsItemId -> HandlerM (Map SrsEntryId SrsEntry)
+        f sMap sId = do
+          let
+            sIdK = (makeKey $ Just sId)
+            s = Map.lookup sIdK sMap
+            sNew = s & _Just . srsEntryNextAnswerDate ?~ d
+            sMap' = Map.update (const sNew) sIdK sMap
+          mapM runSrsDB (updateSrsEntry <$> sNew)
+          return sMap'
+
+      nMap <- foldlM f srsEsMap ss
+      modify (set srsEntries nMap)
+
+    DeleteSrsItems -> do
+      let
+        f :: Map SrsEntryId SrsEntry -> SrsItemId -> HandlerM (Map SrsEntryId SrsEntry)
+        f sMap sId = do
+          let
+            sIdK = (makeKey $ Just sId)
+            s = Map.lookup sIdK sMap
+            sNew = s & _Just . srsEntryIsDeleted .~ True
+            sMap' = Map.update (const sNew) sIdK sMap
+          mapM runSrsDB (updateSrsEntry <$> sNew)
+          return sMap'
+
+      nMap <- foldlM f srsEsMap ss
+      modify (set srsEntries nMap)
 
   getBrowseSrsItems filt

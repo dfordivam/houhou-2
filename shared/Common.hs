@@ -134,6 +134,7 @@ data SrsItem = SrsItem
 
 data BulkEditOperation
   = SuspendSrsItems
+  | ResumeSrsItems
   | ChangeSrsLevel SrsLevel
   | ChangeSrsReviewData UTCTime
   | DeleteSrsItems

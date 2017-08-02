@@ -10,6 +10,7 @@ import Common
 import Radicals
 import Data.Text (Text)
 import qualified Data.Text as T
+import Control.Lens
 
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -24,12 +25,13 @@ import Reflex.Dom.WebSocket.Monad
 import Reflex.Dom.WebSocket.Message
 import Reflex.Dom.SemanticUI
 import Data.Time.Clock
+import Data.Time.Calendar
 
 data VisibleWidget = KanjiFilterVis | KanjiDetailPageVis
   deriving (Eq)
 
 kanjiBrowseWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
   => WithWebSocketT Message.AppRequest t m ()
 kanjiBrowseWidget = divClass "ui internally celled grid" $ divClass "row" $ do
 
@@ -86,7 +88,8 @@ kanjiBrowseWidget = divClass "ui internally celled grid" $ divClass "row" $ do
 -- Widget to show kanjifilter
 
 handleVisibility
-  :: (PostBuild t m, DomBuilder t m, Eq a)
+  :: (_)
+  -- :: (PostBuild t m, DomBuilder t m, Eq a)
   => a -> Dynamic t a -> m v -> m v
 handleVisibility v dv mv = elDynAttr "div" (f <$> dv) mv
   where
@@ -96,7 +99,8 @@ handleVisibility v dv mv = elDynAttr "div" (f <$> dv) mv
         else ("style" =: "display: none;")
 
 kanjiFilterWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => Event t [RadicalId]
   -> WithWebSocketT Message.AppRequest t m (Event t KanjiFilter)
 kanjiFilterWidget validRadicalsEv = do
@@ -126,7 +130,8 @@ kanjiFilterWidget validRadicalsEv = do
   return $ updated kanjiFilter
 
 radicalMatrix
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => Event t [RadicalId] -> m (Dynamic t [RadicalId])
 radicalMatrix evValid = do
 
@@ -172,7 +177,8 @@ radicalMatrix evValid = do
 
 
 kanjiListWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => Event t KanjiList -> m (Event t KanjiId)
 kanjiListWidget listEv = do
   let kanjiTable itms = do
@@ -192,7 +198,8 @@ kanjiListWidget listEv = do
   -- show list
 
 kanjiDetailsWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => Event t KanjiSelectionDetails -> m ()
 kanjiDetailsWidget ev = do
   let f (KanjiSelectionDetails k v) = do
@@ -260,7 +267,8 @@ textMay (Just v) = text v
 textMay Nothing = text ""
 
 vocabSearchWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => WithWebSocketT Message.AppRequest t m ()
 vocabSearchWidget = divClass "ui grid" $ divClass "row" $ do
 
@@ -277,7 +285,8 @@ vocabSearchWidget = divClass "ui grid" $ divClass "row" $ do
   void $ widgetHold (return ()) (vocabListWindow <$> vocabResEv)
 
 srsWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => WithWebSocketT Message.AppRequest t m ()
 srsWidget =  divClass "ui grid" $ do
 
@@ -286,7 +295,8 @@ srsWidget =  divClass "ui grid" $ do
   return ()
 
 showStats
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => WithWebSocketT Message.AppRequest t m ()
 showStats = do
   ev <- getPostBuild
@@ -294,7 +304,8 @@ showStats = do
   void $ widgetHold (return ()) (showStatsWidget <$> s)
 
 showStatsWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => SrsStats -> m ()
 showStatsWidget s = do
   startReview <- divClass "ui grid row" $ do
@@ -369,7 +380,8 @@ progressStatsCard l l1 l2 (v1,v2) =
 -- fetch srs items for every change in filter
 --
 browseSrsItemsWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (_)
+  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
   => WithWebSocketT Message.AppRequest t m ()
 browseSrsItemsWidget = do
 
@@ -407,69 +419,101 @@ browseSrsItemsWidget = do
 
     filteredList <- getWebSocketResponse browseSrsFilterEv
     browseSrsFilterDyn <- holdDyn (BrowseSrsItems []) browseSrsFilterEv
-    let
-      -- itemEv :: Event t [SrsItem]
-      -- initItemList = never
-      itemEv = filteredList -- leftmost [initItemList, filteredList]
+    rec
+      let
+        -- itemEv :: Event t [SrsItem]
+        -- initItemList = never
+        itemEv = leftmost [filteredList, afterEditList]
 
-      checkBoxSelAllEv = updated $
-        value selectAllToggleCheckBox
+        checkBoxSelAllEv = updated $
+          value selectAllToggleCheckBox
 
-      checkBoxList es =
-        divClass "eight wide column centered" $ do
-          el "label" $ text "Select Items to do bulk edit"
-          evs <- elAttr "div" (("class" =: "ui list")
-                               <> ("style" =: "height: 400px; overflow-y: scroll")) $
-            forM es checkBoxEl
+        checkBoxList es =
+          divClass "eight wide column centered" $ do
+            el "label" $ text "Select Items to do bulk edit"
+            evs <- elAttr "div" (("class" =: "ui middle aligned selection list")
+                                 <> ("style" =: "height: 400px; overflow-y: scroll")) $
+              forM es checkBoxEl
 
-          let f (v, True) s = Set.insert v s
-              f (v, False) s = Set.delete v s
-          selList <- foldDyn f Set.empty (leftmost evs)
+            let f (v, True) s = Set.insert v s
+                f (v, False) s = Set.delete v s
+            selList <- foldDyn f Set.empty (leftmost evs)
 
-          return $ Set.toList <$> selList
+            return $ Set.toList <$> selList
 
-      checkBoxEl (SrsItem i v _ _) = divClass "item" $ do
-        let
-          f (Left (VocabT ((Kana k):_))) = k
-          f (Right (KanjiT k)) = k
-        c1 <- uiCheckbox (text $ f v) $
-          def & setValue .~ checkBoxSelAllEv
-        return $ (,) i <$> updated (value c1)
+        checkBoxEl (SrsItem i v sus pend) = divClass "item" $ do
+          let
+            f (Left (VocabT ((Kana k):_))) = k
+            f (Right (KanjiT k)) = k
+            c = if sus
+              then divClass "ui basic grey label"
+              else if pend
+                then divClass "ui basic violet label"
+                else divClass "ui basic black label"
+            e = c $ (text $ f v)
+          c1 <- uiCheckbox e $
+            def & setValue .~ checkBoxSelAllEv
+          return $ (,) i <$> updated (value c1)
 
-    -- List and selection checkBox
-    selList <- divClass "ui grid row" $ do
-      widgetHold (checkBoxList []) (checkBoxList <$> itemEv)
+      -- List and selection checkBox
+      selList <- divClass "ui grid row" $ do
+        widgetHold (checkBoxList []) (checkBoxList <$> itemEv)
 
-    -- Action buttons
-    selList <- divClass "ui grid row" $ do
+      -- Action buttons
+      afterEditList <- divClass "ui grid row" $ do
 
-      suspendEv <- divClass "two wide column centered" $
-        uiButton (constDyn def) (text "Suspend")
+        suspendEv <- divClass "two wide column centered" $
+          uiButton (constDyn def) (text "Suspend")
 
-      deleteEv <- divClass "two wide column centered" $
-        uiButton (constDyn def) (text "Delete")
+        resumeEv <- divClass "two wide column centered" $
+          uiButton (constDyn def) (text "Resume")
 
-      changeLvlSel <- divClass "two wide column centered" $
-        uiDropdown srsLevels [DOFSelection] $
-          def & dropdownConf_initialValue .~ Just 0
-      changeLvlDyn <- foldDynMaybe const 0 $
-        updated changeLvlSel
-      changeLvlEv <- divClass "two wide column centered" $
-        uiButton (constDyn def) (text "Change Level")
+        deleteEv <- divClass "two wide column centered" $
+          uiButton (constDyn def) (text "Delete")
 
-      reviewDateChange <- divClass "two wide column centered" $
-        uiButton (constDyn def) (text "Change Review Date")
+        changeLvlSel <- divClass "two wide column centered" $
+          uiDropdown srsLevels [DOFSelection] $
+            def & dropdownConf_initialValue .~ Just 0
+        changeLvlDyn <- foldDynMaybe const 0 $
+          updated changeLvlSel
+        changeLvlEv <- divClass "two wide column centered" $
+          uiButton (constDyn def) (text "Change Level")
 
-      reviewDate <- liftIO getCurrentTime
-      let bEditOp = leftmost
-            [DeleteSrsItems <$ deleteEv
-            , SuspendSrsItems <$ suspendEv
-            , ChangeSrsLevel <$> tagPromptlyDyn changeLvlDyn changeLvlEv
-            , ChangeSrsReviewData reviewDate
-              <$ reviewDateChange]
-      getWebSocketResponse $ (\((s,b),e) -> BulkEditSrsItems s e b) <$>
-        (attachDyn ((,) <$> (join selList) <*> browseSrsFilterDyn) bEditOp)
+        reviewDateChange <- divClass "two wide column centered" $
+          uiButton (constDyn def) (text "Change Review Date")
+
+        dateDyn <- divClass "two wide column centered" $ datePicker
+        let bEditOp = leftmost
+              [DeleteSrsItems <$ deleteEv
+              , SuspendSrsItems <$ suspendEv
+              , ResumeSrsItems <$ resumeEv
+              , ChangeSrsLevel <$> tagPromptlyDyn changeLvlDyn changeLvlEv
+              , ChangeSrsReviewData <$> tagPromptlyDyn dateDyn reviewDateChange]
+        getWebSocketResponse $ (\((s,b),e) -> BulkEditSrsItems s e b) <$>
+          (attachDyn ((,) <$> (join selList) <*> browseSrsFilterDyn) bEditOp)
 
     void $ divClass "ui row" $
       uiButton (constDyn def) (text "Close Widget")
   return ()
+
+datePicker = divClass "ui grid row " $ do
+  currentTime <- liftIO getCurrentTime
+  let dayList = makeList <$> [1..31]
+      monthList = makeList <$> [1..12]
+      yearList = makeList <$> [2000..2030]
+      makeList x = (x, DropdownItemConfig (tshow x) (text $ tshow x))
+      (currentYear, currentMonth, currentDay)
+        = (\(UTCTime d _) -> toGregorian d) currentTime
+      mycol = divClass "column"
+        --elAttr "div" (("class" =: "column") <> ("style" =: "min-width: 2em;"))
+  day <- mycol $ uiDropdown dayList [DOFSearch, DOFSelection] $
+    def & dropdownConf_placeholder .~ "Day"
+        & dropdownConf_initialValue ?~ (currentDay)
+  month <- mycol $ uiDropdown monthList [DOFSearch, DOFSelection] $
+    def & dropdownConf_placeholder .~ "Month"
+        & dropdownConf_initialValue ?~ (currentMonth)
+  year <- mycol $ uiDropdown yearList [DOFSearch, DOFSelection] $
+    def & dropdownConf_placeholder .~ "Year"
+        & dropdownConf_initialValue ?~ (currentYear)
+  let f y m d = maybe (utctDay currentTime) identity $ fromGregorian <$> y <*> m <*> d
+  return $ UTCTime <$> (f <$> year <*> month <*> day) <*> pure 1
