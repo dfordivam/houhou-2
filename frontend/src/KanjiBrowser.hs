@@ -537,55 +537,91 @@ openEditSrsItemWidget
 openEditSrsItemWidget i ev = do
   srsItEv <- getWebSocketResponse $ GetSrsItem i <$ ev
 
-  let modalWidget (Just s) = do
+  let
+      modalWidget :: (AppMonad t m) => Maybe SrsItemFull -> AppMonadT t m ()
+      modalWidget (Just s) = do
         ev <- getPostBuild
         uiModal (ShowModal <$ ev) (editWidget s)
       modalWidget Nothing = do
         ev <- getPostBuild
         uiModal (ShowModal <$ ev) (text $ "Some Error")
 
-      modalWidget :: (AppMonad t m) => Maybe SrsItemFull -> m ()
 
       f (Left (VocabT ((Kana k):_))) = k
       f (Right (KanjiT k)) = k
 
-      editWidget :: MonadWidget t m => SrsItemFull -> m ()
+      editWidget :: AppMonad t m => SrsItemFull -> AppMonadT t m ()
       editWidget s = do
-        elClass "h4" "ui header" $ do
+        rec
+          (sNew, saveEv) <- editWidgetView s ev
+          ev <- getWebSocketResponse $ EditSrsItem <$> tagDyn sNew saveEv
+        return ()
+
+      editWidgetView
+        :: MonadWidget t m
+        => SrsItemFull
+        -> Event t ()
+        -> m (Dynamic t SrsItemFull, Event t ())
+      editWidgetView s savedEv = divClass "ui raised very padded container segment" $ do
+        elClass "h3" "ui dividing header" $ do
           text $ "Edit " <> (f $ srsItemFullVocabOrKanji s)
 
-        el "label" $ text "Meaning"
-        meaningTxtInp <- divClass "ui compact segment" $ do
-          uiTextInput (constDyn def) $ def &
-            textInputConfig_initialValue .~ (srsMeanings s)
-
-        el "label" $ text "Reading"
-        readingTxtInp <- divClass "ui compact segment" $ do
-          uiTextInput (constDyn def) $ def &
-            textInputConfig_initialValue .~ (srsReadings s)
-
-        el "label" $ text "Meaning Notes"
-        meaningNotesTxtInp <- divClass "ui form" $ divClass "field" $ do
-          textArea $ def &
-            textAreaConfig_initialValue .~
-              (maybe "" identity (srsMeaningNote s))
-
-        el "label" $ text "Reading Notes"
-        readingNotesTxtInp <- divClass "ui form" $ divClass "field" $ do
-          textArea $ def &
-            textAreaConfig_initialValue .~
-              (maybe "" identity (srsReadingNote s))
-
-        el "label" $ text "Tags"
-        tagsTxtInp <- divClass "ui compact segment" $ do
-          uiTextInput (constDyn def) $ def &
-            textInputConfig_initialValue .~
-              (maybe "" identity (srsTags s))
-
-        el "label" $ text "Next Review Date"
-        reviewDateDyn <- divClass "ui compact segment" $ do
+        reviewDateDyn <- divClass "ui grid row" $ do
           reviewDataPicker (srsReviewDate s)
-        return ()
+
+        (m,r) <- divClass "ui two column grid" $ do
+          meaningTxtInp <- divClass "column" $ divClass "inline field" $ do
+            divClass "ui large blue right pointing label" $ text "Meaning"
+            uiTextInput (constDyn def) $ def &
+              textInputConfig_initialValue .~ (srsMeanings s)
+
+          readingTxtInp <- divClass "column" $ divClass "inline field" $ do
+            divClass "ui large blue right pointing label" $ text "Reading"
+            uiTextInput (constDyn def) $ def &
+              textInputConfig_initialValue .~ (srsReadings s)
+
+          return (meaningTxtInp, readingTxtInp)
+
+        (mn,rn) <- divClass "ui two column grid" $ do
+          meaningNotesTxtInp <- divClass "column" $ do
+            divClass "ui large blue bottom pointing label" $ text "Meaning Notes"
+            divClass "ui form" $ divClass "field" $ do
+              textArea $ def &
+                textAreaConfig_initialValue .~
+                  (maybe "" identity (srsMeaningNote s))
+
+          readingNotesTxtInp <- divClass "column" $ do
+            divClass "ui large blue bottom pointing label" $ text "Reading Notes"
+            divClass "ui form" $ divClass "field" $ do
+              textArea $ def &
+                textAreaConfig_initialValue .~
+                  (maybe "" identity (srsReadingNote s))
+
+          return (meaningNotesTxtInp, readingNotesTxtInp)
+
+        tagsTxtInp <- divClass "ui grid row" $ do
+          divClass "column" $ divClass "inline field" $ do
+            divClass "ui large blue right pointing label" $ text "Tags"
+            uiTextInput (constDyn def) $ def &
+              textInputConfig_initialValue .~
+                (maybe "" identity (srsTags s))
+
+        saveEv <- divClass "ui grid row" $ do
+          let savedIcon = elClass "i" "big green checkmark icon" $ return ()
+          ev <- uiButton (constDyn def) (text "Save")
+          widgetHold (return ()) (savedIcon <$ savedEv)
+          return ev
+
+        let ret = SrsItemFull (srsItemFullId s) (srsItemFullVocabOrKanji s)
+                    <$> reviewDateDyn <*> (value m) <*> (value r)
+                    <*> pure (srsCurrentGrade s) <*> g mn <*> g rn
+                    <*> g tagsTxtInp
+            g v = gg <$> value v
+            gg t
+              | T.null t = Nothing
+              | otherwise = Just t
+
+        return (ret, saveEv)
 
       reviewDataPicker :: (MonadWidget t m) =>
         Maybe UTCTime -> m (Dynamic t (Maybe UTCTime))
@@ -597,9 +633,11 @@ openEditSrsItemWidget i ev = do
             uiButton (constDyn def) (text "Add Next Review Date")
 
           selectDateW = do
-            removeDate <- uiButton (constDyn def) (text "Remove Review Date")
-            newDateDyn <- datePicker defDate
-            return (removeDate, newDateDyn)
+            divClass "ui two column grid" $ do
+              newDateDyn <- divClass "column" $ datePicker defDate
+              removeDate <- divClass "column" $
+                uiButton (constDyn def) (text "Remove Review Date")
+              return (removeDate, newDateDyn)
 
           defDate = maybe currentTime identity inp
 
