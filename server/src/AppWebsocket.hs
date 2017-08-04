@@ -69,6 +69,7 @@ handler = HandlerWrapper $
   :<&> h getBrowseSrsItems
   :<&> h getGetNextReviewItem
   :<&> h getDoReview
+  :<&> h getSrsItem
   :<&> h getEditSrsItem
   :<&> h getBulkEditSrsItems
 

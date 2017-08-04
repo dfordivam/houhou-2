@@ -132,6 +132,19 @@ data SrsItem = SrsItem
  }
   deriving (Generic, Show)
 
+data SrsItemFull = SrsItemFull
+  { srsItemFullId :: SrsItemId
+  , srsItemFullVocabOrKanji :: Either VocabT KanjiT
+  , srsReviewDate :: (Maybe UTCTime)
+  , srsMeanings :: (Text)
+  , srsReadings :: (Text)
+  , srsCurrentGrade :: (Int)
+  , srsMeaningNote :: (Maybe Text)
+  , srsReadingNote :: (Maybe Text)
+  , srsTags :: (Maybe Text)
+  }
+  deriving (Generic, Show)
+
 data BulkEditOperation
   = SuspendSrsItems
   | ResumeSrsItems
@@ -215,3 +228,6 @@ instance FromJSON BulkEditOperation
 instance ToJSON SrsItem where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON SrsItem
+instance ToJSON SrsItemFull where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON SrsItemFull

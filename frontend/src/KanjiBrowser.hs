@@ -1,6 +1,7 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ConstraintKinds #-}
 module KanjiBrowser where
 
 import Protolude hiding (link, (&))
@@ -11,6 +12,7 @@ import Radicals
 import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Lens
+import Control.Monad.Fix
 
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -27,12 +29,17 @@ import Reflex.Dom.SemanticUI
 import Data.Time.Clock
 import Data.Time.Calendar
 
+--
+type AppMonadT t m = WithWebSocketT Message.AppRequest t m
+type AppMonad t m = (MonadWidget t m
+                    , PrimMonad m)
+
 data VisibleWidget = KanjiFilterVis | KanjiDetailPageVis
   deriving (Eq)
 
 kanjiBrowseWidget
-  :: (_)
-  => WithWebSocketT Message.AppRequest t m ()
+  :: AppMonad t m
+  => AppMonadT t m ()
 kanjiBrowseWidget = divClass "ui internally celled grid" $ divClass "row" $ do
 
   ev <- getPostBuild
@@ -88,8 +95,7 @@ kanjiBrowseWidget = divClass "ui internally celled grid" $ divClass "row" $ do
 -- Widget to show kanjifilter
 
 handleVisibility
-  :: (_)
-  -- :: (PostBuild t m, DomBuilder t m, Eq a)
+  :: (DomBuilder t m, PostBuild t m, Eq a)
   => a -> Dynamic t a -> m v -> m v
 handleVisibility v dv mv = elDynAttr "div" (f <$> dv) mv
   where
@@ -99,10 +105,9 @@ handleVisibility v dv mv = elDynAttr "div" (f <$> dv) mv
         else ("style" =: "display: none;")
 
 kanjiFilterWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: AppMonad t m
   => Event t [RadicalId]
-  -> WithWebSocketT Message.AppRequest t m (Event t KanjiFilter)
+  -> AppMonadT t m (Event t KanjiFilter)
 kanjiFilterWidget validRadicalsEv = do
   sentenceTextArea <- divClass "row" $ textArea def
 
@@ -130,8 +135,14 @@ kanjiFilterWidget validRadicalsEv = do
   return $ updated kanjiFilter
 
 radicalMatrix
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: ( DomBuilder t m
+     , MonadIO (Performable m)
+     , TriggerEvent t m
+     , MonadHold t m
+     , PostBuild t m
+     , PerformEvent t m
+     , MonadFix m
+     )
   => Event t [RadicalId] -> m (Dynamic t [RadicalId])
 radicalMatrix evValid = do
 
@@ -177,8 +188,7 @@ radicalMatrix evValid = do
 
 
 kanjiListWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (DomBuilder t m, MonadHold t m)
   => Event t KanjiList -> m (Event t KanjiId)
 kanjiListWidget listEv = do
   let kanjiTable itms = do
@@ -198,8 +208,7 @@ kanjiListWidget listEv = do
   -- show list
 
 kanjiDetailsWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (DomBuilder t m, MonadHold t m)
   => Event t KanjiSelectionDetails -> m ()
 kanjiDetailsWidget ev = do
   let f (KanjiSelectionDetails k v) = do
@@ -229,7 +238,7 @@ kanjiDetailWindow (KanjiDetails k r m g j w on ku no) = do
         textMay (unOnYomiT <$> on)
         textMay (unKunYomiT <$> ku)
 
-vocabListWindow :: _ => [VocabDispItem] -> m ()
+vocabListWindow :: DomBuilder t m => [VocabDispItem] -> m ()
 vocabListWindow vs = do
   let
     dispVocab
@@ -251,7 +260,7 @@ vocabListWindow vs = do
   divClass "ui grid container" $ do
     forM_ vs dispVocab
 
-displayVocabT :: _ => VocabT -> m ()
+displayVocabT :: DomBuilder t m => VocabT -> m ()
 displayVocabT (VocabT ks) = do
   let
     f k = case k of
@@ -267,9 +276,8 @@ textMay (Just v) = text v
 textMay Nothing = text ""
 
 vocabSearchWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
-  => WithWebSocketT Message.AppRequest t m ()
+  :: AppMonad t m
+  => AppMonadT t m ()
 vocabSearchWidget = divClass "ui grid" $ divClass "row" $ do
 
   vocabResEv <- divClass "row" $ do
@@ -285,27 +293,24 @@ vocabSearchWidget = divClass "ui grid" $ divClass "row" $ do
   void $ widgetHold (return ()) (vocabListWindow <$> vocabResEv)
 
 srsWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
-  => WithWebSocketT Message.AppRequest t m ()
-srsWidget =  divClass "ui grid" $ do
+  :: AppMonad t m
+  => AppMonadT t m ()
+srsWidget = divClass "ui grid" $ do
 
   showStats
   browseSrsItemsWidget
   return ()
 
 showStats
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
-  => WithWebSocketT Message.AppRequest t m ()
+  :: AppMonad t m
+  => AppMonadT t m ()
 showStats = do
   ev <- getPostBuild
   s <- getWebSocketResponse (GetSrsStats () <$ ev)
   void $ widgetHold (return ()) (showStatsWidget <$> s)
 
 showStatsWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
+  :: (MonadWidget t m)
   => SrsStats -> m ()
 showStatsWidget s = do
   startReview <- divClass "ui grid row" $ do
@@ -380,11 +385,11 @@ progressStatsCard l l1 l2 (v1,v2) =
 -- fetch srs items for every change in filter
 --
 browseSrsItemsWidget
-  :: (_)
-  -- :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
-  => WithWebSocketT Message.AppRequest t m ()
+  :: AppMonad t m
+  => AppMonadT t m ()
 browseSrsItemsWidget = do
 
+  currentTime <- liftIO getCurrentTime
   -- ev <- getPostBuild
   -- initItemList <- getWebSocketResponse $ BrowseSrsItems [0] <$ ev
 
@@ -450,8 +455,13 @@ browseSrsItemsWidget = do
               else if pend
                 then divClass "ui basic violet label"
                 else divClass "ui basic black label"
-            e = c $ (text $ f v)
-          c1 <- uiCheckbox e $
+            editButton = uiButton (constDyn def) (text "Edit")
+            wrap cb = do
+              divClass "right floated content" $ do
+                ev <- editButton
+                openEditSrsItemWidget i ev
+              divClass "content" $ cb
+          c1 <- wrap $ uiCheckbox (c $ (text $ f v)) $
             def & setValue .~ checkBoxSelAllEv
           return $ (,) i <$> updated (value c1)
 
@@ -482,7 +492,7 @@ browseSrsItemsWidget = do
         reviewDateChange <- divClass "two wide column centered" $
           uiButton (constDyn def) (text "Change Review Date")
 
-        dateDyn <- divClass "two wide column centered" $ datePicker
+        dateDyn <- divClass "two wide column centered" $ datePicker currentTime
         let bEditOp = leftmost
               [DeleteSrsItems <$ deleteEv
               , SuspendSrsItems <$ suspendEv
@@ -496,14 +506,16 @@ browseSrsItemsWidget = do
       uiButton (constDyn def) (text "Close Widget")
   return ()
 
-datePicker = divClass "ui grid row " $ do
-  currentTime <- liftIO getCurrentTime
+datePicker
+  :: (MonadWidget t m)
+  => UTCTime -> m (Dynamic t UTCTime)
+datePicker defTime = divClass "ui grid row " $ do
   let dayList = makeList <$> [1..31]
       monthList = makeList <$> [1..12]
       yearList = makeList <$> [2000..2030]
       makeList x = (x, DropdownItemConfig (tshow x) (text $ tshow x))
       (currentYear, currentMonth, currentDay)
-        = (\(UTCTime d _) -> toGregorian d) currentTime
+        = (\(UTCTime d _) -> toGregorian d) defTime
       mycol = divClass "column"
         --elAttr "div" (("class" =: "column") <> ("style" =: "min-width: 2em;"))
   day <- mycol $ uiDropdown dayList [DOFSearch, DOFSelection] $
@@ -515,5 +527,90 @@ datePicker = divClass "ui grid row " $ do
   year <- mycol $ uiDropdown yearList [DOFSearch, DOFSelection] $
     def & dropdownConf_placeholder .~ "Year"
         & dropdownConf_initialValue ?~ (currentYear)
-  let f y m d = maybe (utctDay currentTime) identity $ fromGregorian <$> y <*> m <*> d
+  let f y m d = maybe (utctDay defTime) identity $ fromGregorian <$> y <*> m <*> d
   return $ UTCTime <$> (f <$> year <*> month <*> day) <*> pure 1
+
+openEditSrsItemWidget
+  :: (AppMonad t m)
+  => SrsItemId -> Event t ()
+  -> AppMonadT t m ()
+openEditSrsItemWidget i ev = do
+  srsItEv <- getWebSocketResponse $ GetSrsItem i <$ ev
+
+  let modalWidget (Just s) = do
+        ev <- getPostBuild
+        uiModal (ShowModal <$ ev) (editWidget s)
+      modalWidget Nothing = do
+        ev <- getPostBuild
+        uiModal (ShowModal <$ ev) (text $ "Some Error")
+
+      modalWidget :: (AppMonad t m) => Maybe SrsItemFull -> m ()
+
+      f (Left (VocabT ((Kana k):_))) = k
+      f (Right (KanjiT k)) = k
+
+      editWidget :: MonadWidget t m => SrsItemFull -> m ()
+      editWidget s = do
+        elClass "h4" "ui header" $ do
+          text $ "Edit " <> (f $ srsItemFullVocabOrKanji s)
+
+        el "label" $ text "Meaning"
+        meaningTxtInp <- divClass "ui compact segment" $ do
+          uiTextInput (constDyn def) $ def &
+            textInputConfig_initialValue .~ (srsMeanings s)
+
+        el "label" $ text "Reading"
+        readingTxtInp <- divClass "ui compact segment" $ do
+          uiTextInput (constDyn def) $ def &
+            textInputConfig_initialValue .~ (srsReadings s)
+
+        el "label" $ text "Meaning Notes"
+        meaningNotesTxtInp <- divClass "ui form" $ divClass "field" $ do
+          textArea $ def &
+            textAreaConfig_initialValue .~
+              (maybe "" identity (srsMeaningNote s))
+
+        el "label" $ text "Reading Notes"
+        readingNotesTxtInp <- divClass "ui form" $ divClass "field" $ do
+          textArea $ def &
+            textAreaConfig_initialValue .~
+              (maybe "" identity (srsReadingNote s))
+
+        el "label" $ text "Tags"
+        tagsTxtInp <- divClass "ui compact segment" $ do
+          uiTextInput (constDyn def) $ def &
+            textInputConfig_initialValue .~
+              (maybe "" identity (srsTags s))
+
+        el "label" $ text "Next Review Date"
+        reviewDateDyn <- divClass "ui compact segment" $ do
+          reviewDataPicker (srsReviewDate s)
+        return ()
+
+      reviewDataPicker :: (MonadWidget t m) =>
+        Maybe UTCTime -> m (Dynamic t (Maybe UTCTime))
+      reviewDataPicker inp = do
+        currentTime <- liftIO getCurrentTime
+
+        let
+          addDateW = do
+            uiButton (constDyn def) (text "Add Next Review Date")
+
+          selectDateW = do
+            removeDate <- uiButton (constDyn def) (text "Remove Review Date")
+            newDateDyn <- datePicker defDate
+            return (removeDate, newDateDyn)
+
+          defDate = maybe currentTime identity inp
+
+        rec
+          vDyn <- holdDyn (isJust inp) (leftmost [False <$ r, True <$ a])
+          a <- handleVisibility False vDyn addDateW
+          (r,d) <- handleVisibility True vDyn selectDateW
+        let
+            f :: Reflex t => (Dynamic t a) -> Bool -> Dynamic t (Maybe a)
+            f d True = Just <$> d
+            f _ _ = pure Nothing
+        return $ join $ f d <$> vDyn
+
+  void $ widgetHold (return ()) (modalWidget <$> srsItEv)

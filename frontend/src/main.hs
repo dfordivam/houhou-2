@@ -23,8 +23,7 @@ main = mainWidget $ do
   return ()
 
 topWidget
-  :: (MonadWidget t m, DomBuilderSpace m ~ GhcjsDomSpace, PrimMonad m)
-  => WithWebSocketT Message.AppRequest t m ()
+  :: AppMonad t m => AppMonadT t m ()
 topWidget = divClass "ui container" $ do
   -- navigation with visibility control
   tabDisplayUI "ui three item menu" "item active" "item" $

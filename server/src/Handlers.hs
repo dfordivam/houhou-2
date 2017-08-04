@@ -245,10 +245,6 @@ getGetNextReviewItem = undefined
 getDoReview            :: DoReview
   -> HandlerM (Maybe ReviewItem)
 getDoReview = undefined
-getEditSrsItem         :: EditSrsItem
-  -> HandlerM ()
-getEditSrsItem = undefined
-
 getBulkEditSrsItems :: BulkEditSrsItems
   -> HandlerM [SrsItem]
 getBulkEditSrsItems (BulkEditSrsItems ss op filt) = do
@@ -342,3 +338,51 @@ getBulkEditSrsItems (BulkEditSrsItems ss op filt) = do
       modify (set srsEntries nMap)
 
   getBrowseSrsItems filt
+
+getSrsItem :: GetSrsItem
+  -> HandlerM (Maybe SrsItemFull)
+getSrsItem (GetSrsItem i) = do
+  srsEsMap <- gets (_srsEntries)
+  let
+      res :: SrsEntry -> Maybe SrsItemFull
+      res s = g s <$> (getKey $ primaryKey s) <*> v
+        where
+          v = case (s ^. srsEntryAssociatedKanji,
+                   s ^. srsEntryAssociatedVocab) of
+                ((Just k), _) -> Just $ Right $ KanjiT k
+                (_, (Just v)) -> Just $ Left $
+                  VocabT $ [Kana v]
+                _ -> Nothing
+      g :: SrsEntry -> Int -> Either Common.VocabT Common.KanjiT -> SrsItemFull
+      g s k v = SrsItemFull k v
+        (s ^. srsEntryNextAnswerDate)
+        (s ^. srsEntryMeanings)
+        (s ^. srsEntryReadings)
+        (s ^. srsEntryCurrentGrade)
+        (s ^. srsEntryMeaningNote)
+        (s ^. srsEntryReadingNote)
+        (s ^. srsEntryTags)
+
+  return $ join $ res <$> Map.lookup (makeKey $ Just i) srsEsMap
+
+getEditSrsItem :: EditSrsItem
+  -> HandlerM ()
+getEditSrsItem (EditSrsItem sItm)= do
+  srsEsMap <- gets (_srsEntries)
+  curTime <- liftIO getCurrentTime
+
+  let
+    sIdK = (makeKey $ Just $ srsItemFullId sItm)
+    s = Map.lookup sIdK srsEsMap
+    sNew = s
+      & _Just . srsEntryNextAnswerDate .~ (srsReviewDate sItm)
+      & _Just . srsEntryMeanings .~ (srsMeanings sItm)
+      & _Just . srsEntryReadings .~ (srsReadings sItm)
+      & _Just . srsEntryCurrentGrade .~ (srsCurrentGrade sItm)
+      & _Just . srsEntryMeaningNote .~ (srsMeaningNote sItm)
+      & _Just . srsEntryReadingNote .~ (srsReadingNote sItm)
+      & _Just . srsEntryTags .~ (srsTags sItm)
+
+    sMap' = Map.update (const sNew) sIdK srsEsMap
+  mapM runSrsDB (updateSrsEntry <$> sNew)
+  void $ modify (set srsEntries sMap')

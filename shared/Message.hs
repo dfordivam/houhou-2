@@ -24,6 +24,7 @@ type AppRequest =
   :<|> BrowseSrsItems
   :<|> GetNextReviewItem
   :<|> DoReview
+  :<|> GetSrsItem
   :<|> EditSrsItem
   :<|> BulkEditSrsItems
 
@@ -122,7 +123,14 @@ instance WebSocketMessage AppRequest DoReview where
   type ResponseT AppRequest DoReview = Maybe ReviewItem
 
 ----------------------------------------------------------------
-data EditSrsItem = EditSrsItem
+data GetSrsItem = GetSrsItem SrsItemId
+  deriving (Generic, Show)
+
+instance WebSocketMessage AppRequest GetSrsItem where
+  type ResponseT AppRequest GetSrsItem = Maybe SrsItemFull
+
+----------------------------------------------------------------
+data EditSrsItem = EditSrsItem SrsItemFull
   deriving (Generic, Show)
 
 instance WebSocketMessage AppRequest EditSrsItem where
@@ -188,3 +196,7 @@ instance FromJSON EditSrsItem
 instance ToJSON BulkEditSrsItems where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON BulkEditSrsItems
+
+instance ToJSON GetSrsItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON GetSrsItem
