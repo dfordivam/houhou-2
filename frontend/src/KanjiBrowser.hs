@@ -68,7 +68,6 @@ kanjiBrowseWidget = divClass "ui internally celled grid" $ divClass "row" $ do
       rec
         let visEv = leftmost [KanjiFilterVis <$ closeEv, KanjiDetailPageVis <$ kanjiDetailsEv]
         vis <- holdDyn KanjiFilterVis visEv
-        let
 
         -- Show either the filter options or the kanji details page
         filterEv <- handleVisibility KanjiFilterVis vis $
@@ -292,29 +291,45 @@ vocabSearchWidget = divClass "ui grid" $ divClass "row" $ do
 
   void $ widgetHold (return ()) (vocabListWindow <$> vocabResEv)
 
+data SrsWidgetView =
+  ShowStatsWindow | ShowReviewWindow | ShowBrowseSrsItemsWindow
+  deriving (Eq)
+
 srsWidget
   :: AppMonad t m
   => AppMonadT t m ()
 srsWidget = divClass "ui grid" $ do
+  let
 
-  -- showStats
-  -- browseSrsItemsWidget
-  reviewWidget
+  rec
+    let
+      visEv = leftmost [ev1,ev2,ev3]
+    vis <- holdDyn ShowStatsWindow visEv
+
+    ev1 <- handleVisibility ShowStatsWindow vis $
+      showStats
+
+    ev2 <- handleVisibility ShowBrowseSrsItemsWindow vis $
+      browseSrsItemsWidget
+
+    ev3 <- handleVisibility ShowReviewWindow vis $
+      reviewWidget
   return ()
 
 showStats
   :: AppMonad t m
-  => AppMonadT t m ()
+  => AppMonadT t m (Event t SrsWidgetView)
 showStats = do
   ev <- getPostBuild
   s <- getWebSocketResponse (GetSrsStats () <$ ev)
-  void $ widgetHold (return ()) (showStatsWidget <$> s)
+  retEvDyn <- widgetHold (return never) (showStatsWidget <$> s)
+  return $ switchPromptlyDyn $ retEvDyn
 
 showStatsWidget
   :: (MonadWidget t m)
-  => SrsStats -> m ()
+  => SrsStats -> m (Event t SrsWidgetView)
 showStatsWidget s = do
-  startReview <- divClass "ui grid row" $ do
+  startReviewEv <- divClass "ui grid row" $ do
     ev <- divClass "four wide centered column" $ do
       divClass "two wide centered column" $
         divClass "ui huge label" $
@@ -351,7 +366,8 @@ showStatsWidget s = do
           text "Set in Stone"
 
   browseEv <- uiButton (constDyn def) (text "Browse Srs Items")
-  return ()
+  return $ leftmost [ShowReviewWindow <$ startReviewEv
+                    , ShowBrowseSrsItemsWindow <$ browseEv]
 
 statsCard t val = divClass "three wide centered column" $ do
   divClass "ui grid centered row" $
@@ -382,27 +398,21 @@ progressStatsCard l l1 l2 (v1,v2) =
         divClass "ui grid centered row" $
           divClass "ui label" $ text $ tshow v2
 
+-- TODO Fix this srsLevels
+srsLevels :: _ => [(SrsLevel, DropdownItemConfig m)]
+srsLevels = map (\g -> (g, DropdownItemConfig (tshow g) (text $ tshow g))) [0..8]
+
 -- Fetch all srs items then apply the filter client side
 -- fetch srs items for every change in filter
 --
 browseSrsItemsWidget
   :: AppMonad t m
-  => AppMonadT t m ()
+  => AppMonadT t m (Event t SrsWidgetView)
 browseSrsItemsWidget = do
-
-  currentTime <- liftIO getCurrentTime
-  -- ev <- getPostBuild
-  -- initItemList <- getWebSocketResponse $ BrowseSrsItems [0] <$ ev
-
+  -- Widget declarations
   let
-    srsLevels :: _ => [(SrsLevel, DropdownItemConfig m)]
-    srsLevels = map (\g -> (g, DropdownItemConfig (tshow g) (text $ tshow g))) [0..8]
 
-
-  -- UI
-  divClass "ui grid row" $ do
-    -- Filter Options
-    (browseSrsFilterEv, selectAllToggleCheckBox) <-
+    filterOptionsWidget =
       divClass "ui grid row" $ do
         -- Selection buttons
         selectAllToggleCheckBox <- divClass "two wide column centered" $ do
@@ -423,89 +433,104 @@ browseSrsItemsWidget = do
 
         return (BrowseSrsItems <$> updated levels, selectAllToggleCheckBox)
 
+    checkBoxList selAllEv es =
+      divClass "eight wide column centered" $ do
+        el "label" $ text "Select Items to do bulk edit"
+        evs <- elAttr "div" (("class" =: "ui middle aligned selection list")
+                             <> ("style" =: "height: 400px; overflow-y: scroll")) $
+          forM es $ checkBoxListEl selAllEv
+
+        let f (v, True) s = Set.insert v s
+            f (v, False) s = Set.delete v s
+        selList <- foldDyn f Set.empty (leftmost evs)
+
+        return $ Set.toList <$> selList
+
+    checkBoxListEl selAllEv (SrsItem i v sus pend) = divClass "item" $ do
+      let
+        f (Left (VocabT ((Kana k):_))) = k
+        f (Right (KanjiT k)) = k
+        c = if sus
+          then divClass "ui basic grey label"
+          else if pend
+            then divClass "ui basic violet label"
+            else divClass "ui basic black label"
+        editButton = uiButton (constDyn def) (text "Edit")
+        wrap cb = do
+          divClass "right floated content" $ do
+            ev <- editButton
+            openEditSrsItemWidget i ev
+          divClass "content" $ cb
+      c1 <- wrap $ uiCheckbox (c $ (text $ f v)) $
+        def & setValue .~ selAllEv
+      return $ (,) i <$> updated (value c1)
+
+  -- UI
+  divClass "ui grid row" $ do
+    -- Filter Options
+    (browseSrsFilterEv, selectAllToggleCheckBox) <-
+      filterOptionsWidget
+
     filteredList <- getWebSocketResponse browseSrsFilterEv
     browseSrsFilterDyn <- holdDyn (BrowseSrsItems []) browseSrsFilterEv
     rec
       let
-        -- itemEv :: Event t [SrsItem]
-        -- initItemList = never
         itemEv = leftmost [filteredList, afterEditList]
 
         checkBoxSelAllEv = updated $
           value selectAllToggleCheckBox
 
-        checkBoxList es =
-          divClass "eight wide column centered" $ do
-            el "label" $ text "Select Items to do bulk edit"
-            evs <- elAttr "div" (("class" =: "ui middle aligned selection list")
-                                 <> ("style" =: "height: 400px; overflow-y: scroll")) $
-              forM es checkBoxEl
-
-            let f (v, True) s = Set.insert v s
-                f (v, False) s = Set.delete v s
-            selList <- foldDyn f Set.empty (leftmost evs)
-
-            return $ Set.toList <$> selList
-
-        checkBoxEl (SrsItem i v sus pend) = divClass "item" $ do
-          let
-            f (Left (VocabT ((Kana k):_))) = k
-            f (Right (KanjiT k)) = k
-            c = if sus
-              then divClass "ui basic grey label"
-              else if pend
-                then divClass "ui basic violet label"
-                else divClass "ui basic black label"
-            editButton = uiButton (constDyn def) (text "Edit")
-            wrap cb = do
-              divClass "right floated content" $ do
-                ev <- editButton
-                openEditSrsItemWidget i ev
-              divClass "content" $ cb
-          c1 <- wrap $ uiCheckbox (c $ (text $ f v)) $
-            def & setValue .~ checkBoxSelAllEv
-          return $ (,) i <$> updated (value c1)
-
       -- List and selection checkBox
       selList <- divClass "ui grid row" $ do
-        widgetHold (checkBoxList []) (checkBoxList <$> itemEv)
+        widgetHold (checkBoxList never [])
+          (checkBoxList checkBoxSelAllEv <$> itemEv)
 
       -- Action buttons
-      afterEditList <- divClass "ui grid row" $ do
+      afterEditList <-
+        bulkEditWidgetActionButtons browseSrsFilterDyn $ join selList
+    return ()
 
-        suspendEv <- divClass "two wide column centered" $
-          uiButton (constDyn def) (text "Suspend")
+  closeEv <- divClass "ui row" $
+    uiButton (constDyn def) (text "Close Widget")
+  return $ ShowStatsWindow <$ closeEv
 
-        resumeEv <- divClass "two wide column centered" $
-          uiButton (constDyn def) (text "Resume")
+bulkEditWidgetActionButtons
+  :: AppMonad t m
+  => Dynamic t BrowseSrsItems
+  -> Dynamic t [SrsItemId]
+  -> AppMonadT t m (Event t [SrsItem])
+bulkEditWidgetActionButtons filtOptsDyn selList = divClass "ui grid row" $ do
+  currentTime <- liftIO getCurrentTime
 
-        deleteEv <- divClass "two wide column centered" $
-          uiButton (constDyn def) (text "Delete")
+  suspendEv <- divClass "two wide column centered" $
+    uiButton (constDyn def) (text "Suspend")
 
-        changeLvlSel <- divClass "two wide column centered" $
-          uiDropdown srsLevels [DOFSelection] $
-            def & dropdownConf_initialValue .~ Just 0
-        changeLvlDyn <- foldDynMaybe const 0 $
-          updated changeLvlSel
-        changeLvlEv <- divClass "two wide column centered" $
-          uiButton (constDyn def) (text "Change Level")
+  resumeEv <- divClass "two wide column centered" $
+    uiButton (constDyn def) (text "Resume")
 
-        reviewDateChange <- divClass "two wide column centered" $
-          uiButton (constDyn def) (text "Change Review Date")
+  deleteEv <- divClass "two wide column centered" $
+    uiButton (constDyn def) (text "Delete")
 
-        dateDyn <- divClass "two wide column centered" $ datePicker currentTime
-        let bEditOp = leftmost
-              [DeleteSrsItems <$ deleteEv
-              , SuspendSrsItems <$ suspendEv
-              , ResumeSrsItems <$ resumeEv
-              , ChangeSrsLevel <$> tagPromptlyDyn changeLvlDyn changeLvlEv
-              , ChangeSrsReviewData <$> tagPromptlyDyn dateDyn reviewDateChange]
-        getWebSocketResponse $ (\((s,b),e) -> BulkEditSrsItems s e b) <$>
-          (attachDyn ((,) <$> (join selList) <*> browseSrsFilterDyn) bEditOp)
+  changeLvlSel <- divClass "two wide column centered" $
+    uiDropdown srsLevels [DOFSelection] $
+      def & dropdownConf_initialValue .~ Just 0
+  changeLvlDyn <- foldDynMaybe const 0 $
+    updated changeLvlSel
+  changeLvlEv <- divClass "two wide column centered" $
+    uiButton (constDyn def) (text "Change Level")
 
-    void $ divClass "ui row" $
-      uiButton (constDyn def) (text "Close Widget")
-  return ()
+  reviewDateChange <- divClass "two wide column centered" $
+    uiButton (constDyn def) (text "Change Review Date")
+
+  dateDyn <- divClass "two wide column centered" $ datePicker currentTime
+  let bEditOp = leftmost
+        [DeleteSrsItems <$ deleteEv
+        , SuspendSrsItems <$ suspendEv
+        , ResumeSrsItems <$ resumeEv
+        , ChangeSrsLevel <$> tagPromptlyDyn changeLvlDyn changeLvlEv
+        , ChangeSrsReviewData <$> tagPromptlyDyn dateDyn reviewDateChange]
+  getWebSocketResponse $ (\((s,b),e) -> BulkEditSrsItems s e b) <$>
+    (attachDyn ((,) <$> selList <*> filtOptsDyn) bEditOp)
 
 datePicker
   :: (MonadWidget t m)
@@ -654,11 +679,17 @@ openEditSrsItemWidget i ev = do
 
   void $ widgetHold (return ()) (modalWidget <$> srsItEv)
 
+reviewWidget
+  :: (AppMonad t m)
+  => AppMonadT t m (Event t SrsWidgetView)
 reviewWidget = do
   let attr = ("class" =: "ui middle aligned center aligned grid")
              <> ("style" =: "height: 50rem;")
-  elAttr "div" attr $ do
+  closeEv <- elAttr "div" attr $ do
     divClass "column" $ do
+
+      closeEv <- divClass "fluid" $
+        uiButton (constDyn def) (text "Close Review")
 
       let statsRowAttr = ("class" =: "ui right aligned container")
                   <> ("style" =: "height: 15rem;")
@@ -699,3 +730,7 @@ reviewWidget = do
         ev3 <- divClass "column" $
           uiButton (constDyn def) (text "Button 3")
         return (ev1, ev2, ev3)
+
+      return closeEv
+
+  return $ ShowStatsWindow <$ closeEv
