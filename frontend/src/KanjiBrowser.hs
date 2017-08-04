@@ -297,8 +297,9 @@ srsWidget
   => AppMonadT t m ()
 srsWidget = divClass "ui grid" $ do
 
-  showStats
-  browseSrsItemsWidget
+  -- showStats
+  -- browseSrsItemsWidget
+  reviewWidget
   return ()
 
 showStats
@@ -652,3 +653,49 @@ openEditSrsItemWidget i ev = do
         return $ join $ f d <$> vDyn
 
   void $ widgetHold (return ()) (modalWidget <$> srsItEv)
+
+reviewWidget = do
+  let attr = ("class" =: "ui middle aligned center aligned grid")
+             <> ("style" =: "height: 50rem;")
+  elAttr "div" attr $ do
+    divClass "column" $ do
+
+      let statsRowAttr = ("class" =: "ui right aligned container")
+                  <> ("style" =: "height: 15rem;")
+          statsTextAttr = ("style" =: "font-size: large;")
+
+      divClass "row" $ elAttr "div" statsRowAttr $ do
+        elAttr "span" statsTextAttr $ text "Stats here"
+
+      let kanjiRowAttr = ("class" =: "row")
+             <> ("style" =: "height: 10rem;")
+          kanjiTextAttr = ("style" =: "font-size: 5rem;")
+
+      elAttr "div" kanjiRowAttr $
+        elAttr "span" kanjiTextAttr $ text "KanjiHere"
+
+      divClass "row" $
+        elClass "form" "ui large form" $
+          divClass "field" $ do
+            let attr = constDyn $ def
+                  & uiInput_fluid ?~ UiFluid
+                tiAttr = def & textInputConfig_attributes
+                         .~ constDyn ("style" =: "text-align: center;\
+                                                 \background-color: palegreen;")
+            uiTextInput attr tiAttr
+
+      let notesRowAttr = ("class" =: "ui left aligned container")
+             <> ("style" =: "height: 10rem;")
+          notesTextAttr = ("style" =: "font-size: large;")
+      divClass "row" $ elAttr "div" notesRowAttr $ do
+        elClass "h3" "" $ text "Notes:"
+        elAttr "p" notesTextAttr $ text "Notes Contents Here"
+
+      divClass "row" $ divClass "ui three column grid" $ do
+        ev1 <- divClass "column" $
+          uiButton (constDyn def) (text "Button 1")
+        ev2 <- divClass "column" $
+          uiButton (constDyn def) (text "Button 2")
+        ev3 <- divClass "column" $
+          uiButton (constDyn def) (text "Button 3")
+        return (ev1, ev2, ev3)
