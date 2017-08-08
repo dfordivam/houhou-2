@@ -539,11 +539,15 @@ getDoReview dr = do
   fetchNewReviewItem
 
 
--- Maintain some state to get random item order
 fetchNewReviewItem :: HandlerM (Maybe ReviewItem)
 fetchNewReviewItem = do
-  srsEsMap <- gets (_srsEntries)
   reviewQ <- gets (_reviewQueue)
+  if null reviewQ
+    then return Nothing
+    else fetchNewReviewItemInt reviewQ
+
+fetchNewReviewItemInt reviewQ = do
+  srsEsMap <- gets (_srsEntries)
   reviewStats <- gets (_reviewStats)
   (rId:_) <- liftIO $ getRandomItems (Map.keys reviewQ) 1
   rtToss <- liftIO $ randomIO
