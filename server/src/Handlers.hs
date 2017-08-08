@@ -545,22 +545,26 @@ fetchNewReviewItem = do
   srsEsMap <- gets (_srsEntries)
   reviewQ <- gets (_reviewQueue)
   reviewStats <- gets (_reviewStats)
+  (rId:_) <- liftIO $ getRandomItems (Map.keys reviewQ) 1
+  rtToss <- liftIO $ randomIO
   let
     -- Algo to fetch random sId
     sId :: Maybe SrsEntryId
     rtDone :: Maybe ReviewType
-    (sId,rtDone) = (\v -> (v ^? _Just . _1,
-                           v ^? _Just . _2 . _1 . _Just ))
-      (fst <$> Map.minViewWithKey reviewQ)
+    (sId,rtDone) = (\v -> (Just rId,
+                           v ^? _Just . _1 . _Just ))
+      (Map.lookup rId reviewQ)
 
     rt :: ReviewType
     rt = case rtDone of
-      Nothing -> ReadingReview -- Random this?
+      Nothing -> if rtToss
+        then ReadingReview
+        else MeaningReview
       (Just ReadingReview) -> MeaningReview
       (Just MeaningReview) -> ReadingReview
 
     s :: Maybe SrsEntry
-    s = join $ Map.lookup <$> sId <*> pure srsEsMap
+    s = Map.lookup rId srsEsMap
 
     i :: Maybe SrsItemId
     i = join $ (getKey <$> (primaryKey <$> s))
@@ -607,4 +611,31 @@ getNextReviewDate
   -> Int
   -> UTCTime
 getNextReviewDate
-  success curTime revDate oldGrade = curTime
+  success curTime revDate oldGrade =
+  let
+    addHour h = addUTCTime (h*60*60) curTime
+    addDay d = addUTCTime (d*24*60*60) curTime
+  in case (oldGrade, success) of
+    (0,_) -> addHour 4
+    (1,False) -> addHour 4
+
+    (2,False) -> addHour 8
+    (1,True) -> addHour 8
+
+    (2,True) -> addDay 1
+    (3,False) -> addDay 1
+
+    (3,True) -> addDay 3
+    (4,False) -> addDay 3
+
+    (4,True) -> addDay 7
+    (5,False) -> addDay 7
+
+    (5,True) -> addDay 14
+    (6,False) -> addDay 14
+
+    (6,True) -> addDay 30
+    (7,False) -> addDay 30
+
+    (7,True) -> addDay 120
+    _ -> curTime -- error
