@@ -109,14 +109,15 @@ instance WebSocketMessage AppRequest BrowseSrsItems where
 data GetNextReviewItem = GetNextReviewItem
   deriving (Generic, Show)
 
-data ReviewItem = ReviewItem
-  deriving (Generic, Show)
-
 instance WebSocketMessage AppRequest GetNextReviewItem where
-  type ResponseT AppRequest GetNextReviewItem = Maybe ReviewItem
+  type ResponseT AppRequest GetNextReviewItem
+    = Maybe ReviewItem
 
 ----------------------------------------------------------------
-data DoReview = DoReview
+data DoReview
+  = DoReview SrsItemId ReviewType Bool
+  | UndoReview
+  | AddAnswer SrsItemId Text ReviewType
   deriving (Generic, Show)
 
 instance WebSocketMessage AppRequest DoReview where
@@ -183,9 +184,6 @@ instance FromJSON SrsItems
 instance ToJSON GetNextReviewItem where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON GetNextReviewItem
-instance ToJSON ReviewItem where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON ReviewItem
 instance ToJSON DoReview where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON DoReview

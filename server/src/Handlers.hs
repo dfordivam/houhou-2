@@ -3,13 +3,14 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 module Handlers where
 
 import Protolude hiding ((&))
 import Control.Lens
 import qualified Model as DB
-import Model hiding (KanjiId, KanjiT)
+import Model hiding (KanjiId, KanjiT, VocabT)
 import Control.Monad.RWS
 import Database.SQLite.Simple
 import Message
@@ -18,17 +19,32 @@ import DBInterface
 import Utils
 import qualified Data.Text as T
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Time.Clock
 import Data.Time.Calendar
 import Text.Pretty.Simple
+import System.Random
 
 type HandlerM = RWST (Connection,Connection) () HandlerState IO
+
+data ReviewStatus =
+  ReviewPending | ReviewFailure
+  deriving (Eq)
+
+-- Nothing -> Both reviews pending
+type ReviewState = (Maybe ReviewType, ReviewStatus)
 
 data HandlerState = HandlerState
   { _kanjiSearchResult :: [DB.Kanji]
   , _kanjiDisplayCount :: Int
   , _srsEntries :: Map SrsEntryId SrsEntry
+  , _reviewQueue :: Map SrsEntryId ReviewState
+  , _undoQueue :: [(Maybe SrsEntry, SrsEntryId, ReviewState)]
+  , _reviewStats :: SrsReviewStats
   }
+
+reviewQueueLength = 10
+undoQueueLength = 20
 makeLenses ''HandlerState
 
 runKanjiDB :: (DBMonad a) -> HandlerM a
@@ -224,12 +240,7 @@ getBrowseSrsItems (BrowseSrsItems lvls) = do
         <*> pure (isJust $ s ^. srsEntrySuspensionDate)
         <*> p (s ^. srsEntryNextAnswerDate)
         where
-          v = case (s ^. srsEntryAssociatedKanji,
-                   s ^. srsEntryAssociatedVocab) of
-                ((Just k), _) -> Just $ Right $ KanjiT k
-                (_, (Just v)) -> Just $ Left $
-                  VocabT $ [Kana v]
-                _ -> Nothing
+          v = getVocabOrKanji s
           p Nothing = Just False
           p (Just d) = Just (d < curTime)
 
@@ -239,12 +250,14 @@ getBrowseSrsItems (BrowseSrsItems lvls) = do
 
   return $ r
 
-getGetNextReviewItem   :: GetNextReviewItem
-  -> HandlerM (Maybe ReviewItem)
-getGetNextReviewItem = undefined
-getDoReview            :: DoReview
-  -> HandlerM (Maybe ReviewItem)
-getDoReview = undefined
+getVocabOrKanji :: SrsEntry -> Maybe (Either VocabT KanjiT)
+getVocabOrKanji s =
+  case (s ^. srsEntryAssociatedKanji,
+        s ^. srsEntryAssociatedVocab) of
+    ((Just k), _) -> Just $ Right $ KanjiT k
+    (_, (Just v)) -> Just $ Left $ VocabT $ [Kana v]
+    _ -> Nothing
+
 getBulkEditSrsItems :: BulkEditSrsItems
   -> HandlerM [SrsItem]
 getBulkEditSrsItems (BulkEditSrsItems ss op filt) = do
@@ -347,12 +360,7 @@ getSrsItem (GetSrsItem i) = do
       res :: SrsEntry -> Maybe SrsItemFull
       res s = g s <$> (getKey $ primaryKey s) <*> v
         where
-          v = case (s ^. srsEntryAssociatedKanji,
-                   s ^. srsEntryAssociatedVocab) of
-                ((Just k), _) -> Just $ Right $ KanjiT k
-                (_, (Just v)) -> Just $ Left $
-                  VocabT $ [Kana v]
-                _ -> Nothing
+          v = getVocabOrKanji s
       g :: SrsEntry -> Int -> Either Common.VocabT Common.KanjiT -> SrsItemFull
       g s k v = SrsItemFull k v
         (s ^. srsEntryNextAnswerDate)
@@ -386,3 +394,217 @@ getEditSrsItem (EditSrsItem sItm)= do
     sMap' = Map.update (const sNew) sIdK srsEsMap
   mapM runSrsDB (updateSrsEntry <$> sNew)
   void $ modify (set srsEntries sMap')
+
+-- maintain state from last review session
+-- Only append to the reviewQueue
+getGetNextReviewItem   :: GetNextReviewItem
+  -> HandlerM (Maybe ReviewItem)
+getGetNextReviewItem _ = do
+  srsEsMap <- gets (_srsEntries)
+  reviewQOld <- gets (_reviewQueue)
+  curTime <- liftIO getCurrentTime
+  let
+    pendingReviewItems = Map.keys $ Map.filter
+      (\s -> isJust $ (<) curTime
+        <$> (s ^. srsEntryNextAnswerDate))
+      srsEsMap
+
+  -- TODO Fix the length issue here
+  reviewQ <- liftIO $ getRandomItems pendingReviewItems
+    reviewQueueLength
+  let newReviewQ = Map.union reviewQOld reviewQMap
+      reviewQMap = Map.fromList $
+        map (\v -> (v,(Nothing,ReviewPending))) reviewQ
+  void $ modify (set reviewQueue newReviewQ)
+
+  fetchNewReviewItem
+
+-- Assumption - A review item which fails while reviewing
+-- will be present in the reviewQueue
+-- Therefore its DB entry is not modified till it is
+-- succesfully reviewed
+
+-- Notes on undoQueue working
+-- Every time the DoReview is called a snapshot of the
+-- Old SrsEntry and the old value of (Maybe ReviewType)
+-- is stored in queue
+getDoReview
+  :: DoReview
+  -> HandlerM (Maybe ReviewItem)
+getDoReview dr = do
+  curTime <- liftIO getCurrentTime
+  srsEsMap <- gets (_srsEntries)
+  reviewQ <- gets (_reviewQueue)
+  undoQ <- gets (_undoQueue)
+  let
+    f r _ r' = case (r,r') of
+      (r, (Nothing,rStatus)) -> Just $ (Just r, rStatus)
+      -- returning Nothing will remove the item from Queue
+      (MeaningReview, (Just ReadingReview,_)) -> Nothing
+      (ReadingReview, (Just MeaningReview,_)) -> Nothing
+      _ -> Just r' -- This is some error condition
+
+    g :: SrsEntryId
+      -> ReviewType
+      -> ReviewState
+      -> SrsEntry
+      -> HandlerM ()
+    g i r rOld sOld =  do
+      let
+        (rOldItemMaybe,rQ) =
+          Map.updateLookupWithKey (f r) i reviewQ
+        uQ = take undoQueueLength $
+          (sOld <$ sNew, i, rOld) : undoQ
+
+        newSrsEntryMap = (\s->Map.insert i s srsEsMap)
+          <$> sNew
+        reviewComplete = Map.notMember i rQ
+
+        -- Just True -> Review correct
+        -- Just False -> Review incorrect
+        reviewSuccess :: Maybe Bool
+        reviewSuccess = if reviewComplete
+          then (== ReviewPending) <$> (snd <$> rOldItemMaybe)
+          else Nothing
+
+        sNew =
+          let
+            g b = getNextReviewDate b curTime
+                (sOld ^. srsEntryNextAnswerDate)
+                (sOld ^. srsEntryCurrentGrade)
+
+          in (flip fmap) reviewSuccess $ \case
+            True -> sOld
+              & srsEntrySuccessCount +~ 1
+              & srsEntryCurrentGrade +~ 1
+              & srsEntryNextAnswerDate ?~ g True
+            False -> sOld
+              & srsEntryFailureCount +~ 1
+              & srsEntryCurrentGrade -~ 1
+              & srsEntryNextAnswerDate ?~ g False
+
+      sequence_ $ (\m -> modify (set srsEntries m))
+        <$> newSrsEntryMap
+      mapM runSrsDB (updateSrsEntry <$> sNew)
+      void $ modify (set reviewQueue rQ)
+      void $ modify (set undoQueue uQ)
+
+  case dr of
+    (DoReview i r True) -> do -- Correct Answer
+      let
+        id = makeKey $ Just i
+        rOld = Map.lookup id reviewQ
+        sOld = Map.lookup id srsEsMap
+
+        fun :: Maybe (HandlerM ())
+        fun = g id r <$> rOld <*> sOld
+      sequence_ fun
+
+    (DoReview i r False) -> do -- Wrong Answer
+      let
+        id = makeKey $ Just i
+        f _ (rt,_) = Just (rt,ReviewFailure)
+        (rOldItemMaybe,rQ) =
+          Map.updateLookupWithKey f id reviewQ
+
+        rOld = maybe (Nothing,ReviewPending) identity
+          rOldItemMaybe
+        uQ = take undoQueueLength $
+          (Nothing, id, rOld) : undoQ
+
+      void $ modify (set reviewQueue rQ)
+      void $ modify (set undoQueue uQ)
+
+    (UndoReview) -> do
+      let
+        h = headMay undoQ
+        fSrsEntry s = do
+          runSrsDB $ updateSrsEntry s
+          let m = Map.insert (primaryKey s) s srsEsMap
+          modify (set srsEntries m)
+
+        fReviewQ (_,id,st) = do
+          let rQ = Map.insert id st reviewQ
+          modify (set reviewQueue rQ)
+
+        fUndoQ (q:qs) = do
+          modify (set undoQueue qs)
+        fUndoQ [] = return ()
+
+      sequence_ $ fSrsEntry <$> (h ^? _Just . _1 ._Just)
+      sequence_ $ fReviewQ <$> h
+      fUndoQ undoQ
+
+    (AddAnswer i t rt) -> return ()
+  fetchNewReviewItem
+
+
+-- Maintain some state to get random item order
+fetchNewReviewItem :: HandlerM (Maybe ReviewItem)
+fetchNewReviewItem = do
+  srsEsMap <- gets (_srsEntries)
+  reviewQ <- gets (_reviewQueue)
+  reviewStats <- gets (_reviewStats)
+  let
+    -- Algo to fetch random sId
+    sId :: Maybe SrsEntryId
+    rtDone :: Maybe ReviewType
+    (sId,rtDone) = (\v -> (v ^? _Just . _1,
+                           v ^? _Just . _2 . _1 . _Just ))
+      (fst <$> Map.minViewWithKey reviewQ)
+
+    rt :: ReviewType
+    rt = case rtDone of
+      Nothing -> ReadingReview -- Random this?
+      (Just ReadingReview) -> MeaningReview
+      (Just MeaningReview) -> ReadingReview
+
+    s :: Maybe SrsEntry
+    s = join $ Map.lookup <$> sId <*> pure srsEsMap
+
+    i :: Maybe SrsItemId
+    i = join $ (getKey <$> (primaryKey <$> s))
+
+    k :: Maybe (Either VocabT KanjiT)
+    k = join $ getVocabOrKanji <$> s
+
+    m :: Maybe (Either (MeaningT, MeaningNotesT)
+                (ReadingT, ReadingNotesT))
+    m = getM <$> s
+    getM s = case rt of
+      MeaningReview -> Left
+        (MeaningT $ s ^. srsEntryMeanings
+        , maybe "" identity $ s ^.srsEntryMeaningNote)
+
+      ReadingReview -> Right
+        (s ^. srsEntryReadings
+        , maybe "" identity $ s ^. srsEntryReadingNote)
+
+    ret = ReviewItem <$> i <*> k <*> m <*> pure reviewStats
+  return ret
+
+
+getRandomItems :: [a] -> Int -> IO [a]
+getRandomItems inp s = do
+  let l = length inp
+      idMap = Map.fromList $ zip [1..l] inp
+
+      loop set = do
+        r <- randomRIO (0,l)
+        let setN = Set.insert r set
+        if Set.size setN >= s
+          then return setN
+          else loop setN
+
+  set <- loop Set.empty
+  return $ catMaybes $
+    fmap (\k -> Map.lookup k idMap) $ Set.toList set
+
+getNextReviewDate
+  :: Bool
+  -> UTCTime
+  -> Maybe UTCTime
+  -> Int
+  -> UTCTime
+getNextReviewDate
+  success curTime revDate oldGrade = curTime

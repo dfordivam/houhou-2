@@ -145,6 +145,27 @@ data SrsItemFull = SrsItemFull
   }
   deriving (Generic, Show)
 
+type ReadingT = Text
+type MeaningNotesT = Text
+type ReadingNotesT = Text
+
+data ReviewType =
+  MeaningReview | ReadingReview
+  deriving (Generic, Eq, Show)
+
+data ReviewItem = ReviewItem
+  SrsItemId
+  (Either VocabT KanjiT)
+  (Either (MeaningT, MeaningNotesT) (ReadingT, ReadingNotesT))
+  SrsReviewStats
+  deriving (Generic, Show)
+
+data SrsReviewStats = SrsReviewStats
+  { srsReviewStats_pendingCount :: Int
+  , srsReviewStats_correctCount :: Int
+  , srsReviewStats_incorrectCount :: Int
+  } deriving (Generic, Show)
+
 data BulkEditOperation
   = SuspendSrsItems
   | ResumeSrsItems
@@ -231,3 +252,12 @@ instance FromJSON SrsItem
 instance ToJSON SrsItemFull where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON SrsItemFull
+instance ToJSON SrsReviewStats where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON SrsReviewStats
+instance ToJSON ReviewItem where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON ReviewItem
+instance ToJSON ReviewType where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON ReviewType

@@ -47,6 +47,7 @@ library
                      , reflex-websocket-interface-server
                      , pretty-simple
                      , time
+                     , random
 
 test-suite unit
   type: exitcode-stdio-1.0

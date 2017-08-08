@@ -298,7 +298,7 @@ data SrsWidgetView =
 srsWidget
   :: AppMonad t m
   => AppMonadT t m ()
-srsWidget = divClass "ui grid" $ do
+srsWidget = divClass "ui container" $ do
   let
 
   rec
@@ -459,7 +459,7 @@ browseSrsItemsWidget = do
         wrap cb = do
           divClass "right floated content" $ do
             ev <- editButton
-            openEditSrsItemWidget i ev
+            openEditSrsItemWidget $ i <$ ev
           divClass "content" $ cb
       c1 <- wrap $ uiCheckbox (c $ (text $ f v)) $
         def & setValue .~ selAllEv
@@ -558,10 +558,10 @@ datePicker defTime = divClass "ui grid row " $ do
 
 openEditSrsItemWidget
   :: (AppMonad t m)
-  => SrsItemId -> Event t ()
+  => Event t (SrsItemId)
   -> AppMonadT t m ()
-openEditSrsItemWidget i ev = do
-  srsItEv <- getWebSocketResponse $ GetSrsItem i <$ ev
+openEditSrsItemWidget ev = do
+  srsItEv <- getWebSocketResponse $ GetSrsItem <$> ev
 
   let
       modalWidget :: (AppMonad t m) => Maybe SrsItemFull -> AppMonadT t m ()
@@ -683,54 +683,119 @@ reviewWidget
   :: (AppMonad t m)
   => AppMonadT t m (Event t SrsWidgetView)
 reviewWidget = do
-  let attr = ("class" =: "ui middle aligned center aligned grid")
-             <> ("style" =: "height: 50rem;")
-  closeEv <- elAttr "div" attr $ do
-    divClass "column" $ do
-
-      closeEv <- divClass "fluid" $
-        uiButton (constDyn def) (text "Close Review")
-
+  let
+    widget inpFieldEv (ReviewItem k n s) = do
       let statsRowAttr = ("class" =: "ui right aligned container")
                   <> ("style" =: "height: 15rem;")
           statsTextAttr = ("style" =: "font-size: large;")
 
       divClass "row" $ elAttr "div" statsRowAttr $ do
-        elAttr "span" statsTextAttr $ text "Stats here"
+        elAttr "span" statsTextAttr $
+          showStats s
 
       let kanjiRowAttr = ("class" =: "row")
              <> ("style" =: "height: 10rem;")
           kanjiTextAttr = ("style" =: "font-size: 5rem;")
 
       elAttr "div" kanjiRowAttr $
-        elAttr "span" kanjiTextAttr $ text "KanjiHere"
+        elAttr "span" kanjiTextAttr $
+          text $ f k
 
-      divClass "row" $
-        elClass "form" "ui large form" $
-          divClass "field" $ do
-            let attr = constDyn $ def
-                  & uiInput_fluid ?~ UiFluid
-                tiAttr = def & textInputConfig_attributes
-                         .~ constDyn ("style" =: "text-align: center;\
-                                                 \background-color: palegreen;")
-            uiTextInput attr tiAttr
+      inpField <- inputField inpFieldEv
 
       let notesRowAttr = ("class" =: "ui left aligned container")
              <> ("style" =: "height: 10rem;")
           notesTextAttr = ("style" =: "font-size: large;")
       divClass "row" $ elAttr "div" notesRowAttr $ do
         elClass "h3" "" $ text "Notes:"
-        elAttr "p" notesTextAttr $ text "Notes Contents Here"
+        elAttr "p" notesTextAttr $ text n
 
-      divClass "row" $ divClass "ui three column grid" $ do
-        ev1 <- divClass "column" $
-          uiButton (constDyn def) (text "Button 1")
-        ev2 <- divClass "column" $
-          uiButton (constDyn def) (text "Button 2")
-        ev3 <- divClass "column" $
-          uiButton (constDyn def) (text "Button 3")
-        return (ev1, ev2, ev3)
+      return inpField
+
+    inputField ev = do
+      let inpFieldAttr = constDyn $ def
+            & uiInput_fluid ?~ UiFluid
+          tiAttr = def
+            $ textInputConfig_setValue .~ ev
+            & textInputConfig_attributes
+            .~ constDyn ("style" =: "text-align: center;\
+                                           \background-color: palegreen;")
+      divClass "row" $
+        elClass "form" "ui large form" $
+          divClass "field" $ do
+            uiTextInput inpFieldAttr tiAttr
+
+    showStats s = do
+      let colour c = ("style" =: ("color: " <> c <>";" ))
+      elAttr "span" (colour "black") $
+        text $ tshow (srsReviewStats_pendingCount s)  <> " "
+      elAttr "span" (colour "green") $
+        text $ tshow (srsReviewStats_correctCount s) <> " "
+      elAttr "span" (colour "red") $
+        text $ tshow (srsReviewStats_incorrectCount s)
+
+  let attr = ("class" =: "ui middle aligned center aligned grid")
+             <> ("style" =: "height: 50rem;")
+
+  ev <- getPostBuild
+  initEv <- getWebSocketResponse $ GetNextReviewItem <$ ev
+
+  closeEv <- elAttr "div" attr $ do
+    divClass "column" $ do
+
+      closeEv <- divClass "fluid" $
+        uiButton (constDyn def) (text "Close Review")
+
+      rec
+        let reviewItemEv = leftmost [initEv, nextReviewItemEv]
+            nrEv = leftmost [dr,evB]
+
+        nextReviewItemEv <- getWebSocketResponse $ nrEv
+
+        (inpField, iDyn) <- widgetHold (return ()) $
+          widget inpFieldEv <$> reviewItemEv
+
+        (dr, inpTxt) <- reviewInputFieldHandler inpField
+
+        evB <- divClass "row" $ divClass "ui three column grid" $ do
+          ev1 <- divClass "column" $
+            uiButton (constDyn def) (text "Undo")
+          ev2 <- divClass "column" $
+            uiButton (constDyn def) (text "Add Meaning")
+          ev3 <- divClass "column" $
+            uiButton (constDyn def) (text "Edit")
+          openEditSrsItemWidget <$> tagDyn i ev3
+          return $ leftmost
+            [UndoReview <$ ev1
+            , AddAnswer <$> tagDyn (value inpField) ev2]
 
       return closeEv
 
   return $ ShowStatsWindow <$ closeEv
+
+-- Convert romaji input to hiragana
+-- Send DoReview signal on pressing enter
+-- Two step review
+-- NewReview enter: check the answer and show the result
+-- ShowAnswer enter: show the next review item
+-- For meaning reviews allow minor mistakes
+reviewInputFieldHandler
+ :: _
+ => TextInput t
+ -> Event t ReviewItem
+ -> m (Event t DoReview, Event t Text)
+reviewInputFieldHandler ti rwEv = do
+  let enterPress = ffilter (==13) (ti .^ textInput_keypress) -- 13 -> Enter
+      correct = (== corAns) <$> value ti
+      h _ NewReview = ShowAnswer
+      h _ ShowAnswer = NewReview
+  dyn <- foldDynMaybe h NewReview enterPress
+  let hiragana = never
+      sendResult = ffilter (== ShowAnswer) (tagDyn dyn enterPress)
+      dr = DoReview <$> tagDyn correct sendResult
+      clearInpField = leftmost ["" <$ rwEv, "" <$ sendResult]
+      txtInpSetEv = leftmost [hiragana, clearInpField]
+  return (dr, txtInpSetEv)
+
+data ReviewState = NewReview | ShowAnswer
+  deriving (Eq)
