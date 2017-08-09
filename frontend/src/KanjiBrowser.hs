@@ -721,11 +721,11 @@ reviewWidgetView ri@(ReviewItem i k n s) = do
     showStats s = do
       let colour c = ("style" =: ("color: " <> c <>";" ))
       elAttr "span" (colour "black") $
-        text $ tshow (srsReviewStats_pendingCount s)  <> " "
+        text $ tshow (_srsReviewStats_pendingCount s)  <> " "
       elAttr "span" (colour "green") $
-        text $ tshow (srsReviewStats_correctCount s) <> " "
+        text $ tshow (_srsReviewStats_correctCount s) <> " "
       elAttr "span" (colour "red") $
-        text $ tshow (srsReviewStats_incorrectCount s)
+        text $ tshow (_srsReviewStats_incorrectCount s)
 
   divClass "row" $ elAttr "div" statsRowAttr $ do
     elAttr "span" statsTextAttr $

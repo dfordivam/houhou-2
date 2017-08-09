@@ -1,12 +1,14 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Common
   where
 
 import Protolude
 -- import GHC.Generics
+import Control.Lens
 import Data.Aeson
 import Data.Default
 import Data.Time (UTCTime)
@@ -161,10 +163,12 @@ data ReviewItem = ReviewItem
   deriving (Generic, Show)
 
 data SrsReviewStats = SrsReviewStats
-  { srsReviewStats_pendingCount :: Int
-  , srsReviewStats_correctCount :: Int
-  , srsReviewStats_incorrectCount :: Int
+  { _srsReviewStats_pendingCount :: Int
+  , _srsReviewStats_correctCount :: Int
+  , _srsReviewStats_incorrectCount :: Int
   } deriving (Generic, Show)
+
+makeLenses ''SrsReviewStats
 
 data BulkEditOperation
   = SuspendSrsItems

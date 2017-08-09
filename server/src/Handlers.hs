@@ -406,13 +406,15 @@ getGetNextReviewItem _ = do
   curTime <- liftIO getCurrentTime
   let
     pendingReviewItems = Map.keys $ Map.filter
+      (\s -> isNothing $ s ^. srsEntrySuspensionDate) $ Map.filter
       (\s -> isJust $ (<) curTime
         <$> (s ^. srsEntryNextAnswerDate))
       srsEsMap
 
-  -- TODO Fix the length issue here
   reviewQ <- liftIO $ getRandomItems pendingReviewItems
     reviewQueueLength
+  modify (set (reviewStats . srsReviewStats_pendingCount)
+          (length pendingReviewItems))
   let newReviewQ = Map.union reviewQOld reviewQMap
       reviewQMap = Map.fromList $
         map (\v -> (v,(Nothing,ReviewPending))) reviewQ
@@ -436,7 +438,7 @@ getDoReview dr = do
   curTime <- liftIO getCurrentTime
   srsEsMap <- gets (_srsEntries)
   reviewQ <- gets (_reviewQueue)
-  reviewStats <- gets (_reviewStats)
+  reviewSts <- gets (_reviewStats)
   undoQ <- gets (_undoQueue)
   let
     f r _ r' = case (r,r') of
@@ -485,8 +487,15 @@ getDoReview dr = do
               & srsEntryCurrentGrade -~ 1
               & srsEntryNextAnswerDate ?~ g False
 
+        statsModify True = over
+          (reviewStats . srsReviewStats_correctCount) (+ 1)
+        statsModify False = over
+          (reviewStats . srsReviewStats_incorrectCount) (+ 1)
+
       sequence_ $ (\m -> modify (set srsEntries m))
         <$> newSrsEntryMap
+      sequence_ $ (\b -> modify (statsModify b))
+        <$> reviewSuccess
       mapM runSrsDB (updateSrsEntry <$> sNew)
       void $ modify (set reviewQueue rQ)
       void $ modify (set undoQueue uQ)
@@ -533,7 +542,7 @@ getDoReview dr = do
 
         fUndoQ ((_,id,_,rt):qs) = do
           modify (set undoQueue qs)
-          return $ getReviewItem srsEsMap reviewStats id rt
+          return $ getReviewItem srsEsMap reviewSts id rt
         fUndoQ [] = return Nothing
 
       sequence_ $ fSrsEntry <$> (h ^? _Just . _1 ._Just)
