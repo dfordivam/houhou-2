@@ -117,7 +117,7 @@ instance WebSocketMessage AppRequest GetNextReviewItem where
 data DoReview
   = DoReview SrsItemId ReviewType Bool
   | UndoReview
-  | AddAnswer SrsItemId Text ReviewType
+  | AddAnswer SrsItemId ReviewType Text
   deriving (Generic, Show)
 
 instance WebSocketMessage AppRequest DoReview where

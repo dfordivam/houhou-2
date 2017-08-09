@@ -39,7 +39,8 @@ data HandlerState = HandlerState
   , _kanjiDisplayCount :: Int
   , _srsEntries :: Map SrsEntryId SrsEntry
   , _reviewQueue :: Map SrsEntryId ReviewState
-  , _undoQueue :: [(Maybe SrsEntry, SrsEntryId, ReviewState)]
+  , _undoQueue :: [(Maybe SrsEntry, SrsEntryId
+                   , ReviewState, ReviewType)]
   , _reviewStats :: SrsReviewStats
   }
 
@@ -435,6 +436,7 @@ getDoReview dr = do
   curTime <- liftIO getCurrentTime
   srsEsMap <- gets (_srsEntries)
   reviewQ <- gets (_reviewQueue)
+  reviewStats <- gets (_reviewStats)
   undoQ <- gets (_undoQueue)
   let
     f r _ r' = case (r,r') of
@@ -454,7 +456,7 @@ getDoReview dr = do
         (rOldItemMaybe,rQ) =
           Map.updateLookupWithKey (f r) i reviewQ
         uQ = take undoQueueLength $
-          (sOld <$ sNew, i, rOld) : undoQ
+          (sOld <$ sNew, i, rOld, r) : undoQ
 
         newSrsEntryMap = (\s->Map.insert i s srsEsMap)
           <$> sNew
@@ -499,6 +501,7 @@ getDoReview dr = do
         fun :: Maybe (HandlerM ())
         fun = g id r <$> rOld <*> sOld
       sequence_ fun
+      fetchNewReviewItem
 
     (DoReview i r False) -> do -- Wrong Answer
       let
@@ -510,10 +513,11 @@ getDoReview dr = do
         rOld = maybe (Nothing,ReviewPending) identity
           rOldItemMaybe
         uQ = take undoQueueLength $
-          (Nothing, id, rOld) : undoQ
+          (Nothing, id, rOld, r) : undoQ
 
       void $ modify (set reviewQueue rQ)
       void $ modify (set undoQueue uQ)
+      fetchNewReviewItem
 
     (UndoReview) -> do
       let
@@ -523,20 +527,20 @@ getDoReview dr = do
           let m = Map.insert (primaryKey s) s srsEsMap
           modify (set srsEntries m)
 
-        fReviewQ (_,id,st) = do
+        fReviewQ (_,id,st,_) = do
           let rQ = Map.insert id st reviewQ
           modify (set reviewQueue rQ)
 
-        fUndoQ (q:qs) = do
+        fUndoQ ((_,id,_,rt):qs) = do
           modify (set undoQueue qs)
-        fUndoQ [] = return ()
+          return $ getReviewItem srsEsMap reviewStats id rt
+        fUndoQ [] = return Nothing
 
       sequence_ $ fSrsEntry <$> (h ^? _Just . _1 ._Just)
       sequence_ $ fReviewQ <$> h
       fUndoQ undoQ
 
-    (AddAnswer i t rt) -> return ()
-  fetchNewReviewItem
+    (AddAnswer i rt t) -> return Nothing
 
 
 fetchNewReviewItem :: HandlerM (Maybe ReviewItem)
@@ -552,12 +556,8 @@ fetchNewReviewItemInt reviewQ = do
   (rId:_) <- liftIO $ getRandomItems (Map.keys reviewQ) 1
   rtToss <- liftIO $ randomIO
   let
-    -- Algo to fetch random sId
-    sId :: Maybe SrsEntryId
     rtDone :: Maybe ReviewType
-    (sId,rtDone) = (\v -> (Just rId,
-                           v ^? _Just . _1 . _Just ))
-      (Map.lookup rId reviewQ)
+    rtDone = (Map.lookup rId reviewQ) ^? _Just . _1 . _Just
 
     rt :: ReviewType
     rt = case rtDone of
@@ -567,6 +567,16 @@ fetchNewReviewItemInt reviewQ = do
       (Just ReadingReview) -> MeaningReview
       (Just MeaningReview) -> ReadingReview
 
+  return $ getReviewItem srsEsMap reviewStats rId rt
+
+getReviewItem
+  :: Map SrsEntryId SrsEntry
+  -> SrsReviewStats
+  -> SrsEntryId
+  -> ReviewType
+  -> Maybe ReviewItem
+getReviewItem srsEsMap reviewStats rId rt =
+  let
     s :: Maybe SrsEntry
     s = Map.lookup rId srsEsMap
 
@@ -589,7 +599,7 @@ fetchNewReviewItemInt reviewQ = do
         , maybe "" identity $ s ^. srsEntryReadingNote)
 
     ret = ReviewItem <$> i <*> k <*> m <*> pure reviewStats
-  return ret
+  in ret
 
 
 getRandomItems :: [a] -> Int -> IO [a]

@@ -23,11 +23,12 @@ import qualified Database.SQLite.Simple as DB
 import qualified Message
 import Network.HTTP.Types.Status
 import qualified Data.Map as Map
+import Common (SrsReviewStats(..))
 
 mainWebSocketHandler :: IO ()
 mainWebSocketHandler = do
   handlerStateRef <- newIORef $
-                     HandlerState [] 20 Map.empty
+    HandlerState [] 20 Map.empty Map.empty [] (SrsReviewStats 0 0 0)
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
   runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
