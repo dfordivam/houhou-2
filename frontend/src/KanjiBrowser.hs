@@ -28,7 +28,7 @@ import Reflex.Dom.WebSocket.Message
 import Reflex.Dom.SemanticUI
 import Data.Time.Clock
 import Data.Time.Calendar
-
+import NLP.Romkan (toHiragana)
 --
 type AppMonadT t m = WithWebSocketT Message.AppRequest t m
 type AppMonad t m = (MonadWidget t m
@@ -781,7 +781,7 @@ inputFieldWidget ri@(ReviewItem i k n s) = do
     style = "text-align: center;" <> color
     color = if rt == MeaningReview
       then "background-color: palegreen;"
-      else "background-color: blue;"
+      else "background-color: aliceblue;"
     rt = case n of
       (Left _) -> MeaningReview
       (Right _) -> ReadingReview
@@ -797,48 +797,53 @@ inputFieldWidget ri@(ReviewItem i k n s) = do
           divClass "field" $ do
             uiTextInput inpFieldAttr tiAttr
 
+    showResult b = do
+      let res = if b then "Correct" else "Incorrect"
+      divClass "row" $ text $ "Result: " <> res
+
   rec
     inpField <- inputField inpTxtEv
-    (dr, inpTxtEv) <-
+    (dr, inpTxtEv, resEv) <-
       reviewInputFieldHandler inpField ri
+  widgetHold (return ()) (showResult <$> resEv)
   return (dr, value inpField)
 
--- Convert romaji input to hiragana
--- Send DoReview signal on pressing enter
--- Two step review
--- NewReview enter: check the answer and show the result
--- ShowAnswer enter: show the next review item
 reviewInputFieldHandler
  :: (MonadFix m,
      MonadHold t m,
      Reflex t)
  => TextInput t
  -> ReviewItem
- -> m (Event t DoReview, Event t Text)
+ -> m (Event t DoReview, Event t Text, Event t Bool)
 reviewInputFieldHandler ti (ReviewItem i k n s) = do
   let enterPress = ffilter (==13) (ti ^. textInput_keypress) -- 13 -> Enter
       correct = checkAnswer n <$> value ti
       h _ NewReview = ShowAnswer
-      h _ ShowAnswer = NewReview
+      h _ ShowAnswer = NextReview
+      h _ _ = NewReview
   dyn <- foldDyn h NewReview enterPress
   let
-    sendResult = ffilter (== ShowAnswer) (tagDyn dyn enterPress)
+    sendResult = ffilter (== NextReview) (tagDyn dyn enterPress)
     dr = DoReview i rt <$> tagDyn correct sendResult
 
     rt = case n of
       (Left _) -> MeaningReview
       (Right _) -> ReadingReview
 
-    hiragana = never
-  return (dr, hiragana)
+    hiragana = case rt of
+      MeaningReview -> never
+      ReadingReview -> toHiragana <$> (ti ^. textInput_input)
+  return (dr, hiragana, tagDyn correct enterPress)
 
 -- TODO
 -- For meaning reviews allow minor mistakes
 checkAnswer :: (Either (MeaningT, MeaningNotesT) (ReadingT, ReadingNotesT))
             -> Text
             -> Bool
-checkAnswer (Left (MeaningT m,_)) t = m == t
-checkAnswer (Right (r,_)) t = r == t
+checkAnswer (Left (MeaningT m,_)) t = elem t answers
+  where answers = T.splitOn "," m
+checkAnswer (Right (r,_)) t = elem t answers
+  where answers = T.splitOn "," r
 
-data ReviewState = NewReview | ShowAnswer
+data ReviewState = NewReview | ShowAnswer | NextReview
   deriving (Eq)

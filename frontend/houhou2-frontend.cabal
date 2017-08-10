@@ -53,6 +53,7 @@ executable         houhou2-frontend
                 , data-default
                 , lens
                 , time
+                , romkan
 
   if impl(ghcjs)
     build-depends: ghcjs-base
