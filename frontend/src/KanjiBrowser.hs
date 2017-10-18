@@ -6,6 +6,7 @@ module KanjiBrowser where
 
 import Protolude hiding (link, (&))
 import Reflex.Dom
+import Reflex.Time
 import Message
 import Common
 import Radicals

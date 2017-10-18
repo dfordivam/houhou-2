@@ -1,3 +1,6 @@
 [submodule "reflex-platform"]
 	path = reflex-platform
 	url = https://github.com/reflex-frp/reflex-platform.git
+[submodule "reflex-websocket-interface"]
+	path = reflex-websocket-interface
+	url = git@github.com:dfordivam/reflex-websocket-interface.git
