@@ -66,7 +66,7 @@ getScriptProcessorNode mediaStream = do
 
   let
     -- 256, 512, 1024, 2048, 4096, 8192 or 16384.
-    bufferSize = 0
+    bufferSize = 8192
   processor <- createScriptProcessor context bufferSize (Just 1) (Just 1)
 
   connect strSrc processor Nothing Nothing
@@ -94,17 +94,18 @@ callBackListener e triggerEvFun = do
   dd <- getChannelData buf 0
 
   let
-      dlen = js_float32array_bytelength dd
+      dlen = js_float32array_length dd
       doff = js_float32array_byteoffset dd
       dbuf = js_float32array_buffer dd
 
-  let bs = toByteString dlen (Just doff) (createFromArrayBuffer dbuf)
+  --  putStrLn $ ("Dlen:" <> show dlen :: Protolude.Text)
+  let bs = toByteString dlen Nothing (createFromArrayBuffer dbuf)
   liftIO $ triggerEvFun bs
 
   -- send wsConn (ArrayBuffer $ unFloat32Array d)
 
 foreign import javascript unsafe
-  "($1).bytelength" js_float32array_bytelength :: Float32Array -> Int
+  "($1).length" js_float32array_length :: Float32Array -> Int
 foreign import javascript unsafe
   "($1).buffer" js_float32array_buffer :: Float32Array -> TA.ArrayBuffer
 foreign import javascript unsafe
