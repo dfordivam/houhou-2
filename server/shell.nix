@@ -16,15 +16,14 @@ let
   dbinterface = ghc.callPackage
     (ghc.haskellSrc2nix {name =
       "dbinterface"; src = ../dbinterface; })
-    #../dbinterface
       {inherit beam-core beam-sqlite dbmodel;};
 
   houhou2-shared = ghc.callPackage (ghc.haskellSrc2nix {name =
       "houhou2-shared"; src = ../shared; })
       {inherit reflex-websocket-interface-shared;};
 
-  reflex-websocket-interface-shared = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/shared {};
-  reflex-websocket-interface-server = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/server {inherit reflex-websocket-interface-shared;};
+  reflex-websocket-interface-shared = ghc.callPackage ../reflex-websocket-interface/shared {};
+  reflex-websocket-interface-server = ghc.callPackage ../reflex-websocket-interface/server {inherit reflex-websocket-interface-shared;};
 
   drv = ghc.callPackage (ghc.haskellSrc2nix
   {name = "houhou2-server";

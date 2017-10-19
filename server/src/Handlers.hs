@@ -487,6 +487,7 @@ getDoReview dr = do
               & srsEntryCurrentGrade -~ 1
               & srsEntryNextAnswerDate ?~ g False
 
+        -- Modify pending review count
         statsModify True = over
           (reviewStats . srsReviewStats_correctCount) (+ 1)
         statsModify False = over
@@ -617,7 +618,7 @@ getRandomItems inp s = do
       idMap = Map.fromList $ zip [1..l] inp
 
       loop set = do
-        r <- randomRIO (0,l)
+        r <- randomRIO (1,l)
         let setN = Set.insert r set
         if Set.size setN >= s
           then return setN

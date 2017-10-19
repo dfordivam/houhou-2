@@ -3,6 +3,7 @@
 import Protolude hiding (link)
 import Reflex.Dom
 import KanjiBrowser
+import AudioCapture
 
 import Reflex.Dom.WebSocket.Monad
 import Reflex.Dom.WebSocket.Message
@@ -13,14 +14,24 @@ import qualified Data.Map as Map
 import Control.Lens
 import Control.Monad.Fix
 
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+
 main = mainWidget $ do
   let url = "ws://localhost:3000/"
+  audioEv <- audioCaptureWidget
+  widgetHold (return ()) (audioProcessor <$> audioEv)
   withWSConnection
     url
     never -- close event
     True -- reconnect
     topWidget
   return ()
+
+-- audioProcessor :: Float32Array -> m ()
+audioProcessor arr = do
+  liftIO $ putStrLn ( "Recieved audioProcessor event" :: Protolude.Text)
+  text $ "audioProcessor: " <> (T.pack $ show (BS.length arr))
 
 topWidget
   :: AppMonad t m => AppMonadT t m ()

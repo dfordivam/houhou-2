@@ -6,8 +6,8 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  reflex-websocket-interface-shared = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/shared {};
-  reflex-websocket-interface = ghc.callPackage ~/repos/reflex/reflex-websocket-interface/reflex {inherit reflex-websocket-interface-shared;};
+  reflex-websocket-interface-shared = ghc.callPackage ../reflex-websocket-interface/shared {};
+  reflex-websocket-interface = ghc.callPackage ../reflex-websocket-interface/reflex {inherit reflex-websocket-interface-shared;};
   reflex-dom-semui = nixpkgs.haskell.lib.dontCheck (ghc.callPackage ~/repos/reflex/reflex-dom-semui {});
 
   drv = ghc.callPackage (ghc.haskellSrc2nix

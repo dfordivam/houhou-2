@@ -14,6 +14,7 @@ executable         houhou2-frontend
     hs-source-dirs:  src
     other-modules:
                 KanjiBrowser
+                AudioCapture
 
     extensions:
                 OverloadedStrings
@@ -54,6 +55,7 @@ executable         houhou2-frontend
                 , lens
                 , time
                 , romkan
+                , jsaddle
 
   if impl(ghcjs)
     build-depends: ghcjs-base
