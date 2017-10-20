@@ -56,6 +56,8 @@ executable         houhou2-frontend
                 , time
                 , romkan
                 , jsaddle
+                , hsmfcc
+                , vector
 
   if impl(ghcjs)
     build-depends: ghcjs-base

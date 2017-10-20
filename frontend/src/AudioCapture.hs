@@ -22,24 +22,32 @@ import GHCJS.DOM
 import Language.Javascript.JSaddle.Value
 import Language.Javascript.JSaddle.Types
 import JavaScript.Object
+
 -- import qualified JavaScript.TypedArray as TA
-import qualified JavaScript.TypedArray.ArrayBuffer as TA
-import GHCJS.Buffer (toByteString, createFromArrayBuffer)
+--import qualified JavaScript.TypedArray.ArrayBuffer as TA
+-- import GHCJS.Buffer (toByteString, createFromArrayBuffer)
 
 import Reflex.Dom
-import Foreign.JavaScript.Utils (bsFromMutableArrayBuffer)
-import Language.Javascript.JSaddle.Helper (mutableArrayBufferFromJSVal)
+-- import Foreign.JavaScript.Utils (bsFromMutableArrayBuffer)
+-- import Language.Javascript.JSaddle.Helper (mutableArrayBufferFromJSVal)
+
+import qualified Data.Vector.Unboxed as VU
+
+type AudioRecordedData = VU.Vector Double
 
 audioCaptureWidget = do
   text "AudioCaptureWidget"
   liftIO $ putStrLn ( "testing" :: Protolude.Text)
   (ev, triggerEvFun) <- newTriggerEvent
-  do
-    mediaStr <- audioSetup
-    processor <- getScriptProcessorNode mediaStr
-    _ <- liftIO $ on processor audioProcess (onAudioProcess triggerEvFun)
-    putStrLn ("MediaStream Setup Done" :: Protolude.Text)
-    return (ev)
+  let process = do
+        mediaStr <- audioSetup
+        processor <- getScriptProcessorNode mediaStr
+        remove <- liftIO $ on processor audioProcess (onAudioProcess triggerEvFun)
+        putStrLn ("MediaStream Setup Done" :: Protolude.Text)
+        liftIO $ forkIO $ threadDelay 5000000 >> remove
+        putStrLn ("MediaStream Stopped" :: Protolude.Text)
+  process
+  return (ev)
 
 audioSetup :: MonadDOM m => m (MediaStream)
 audioSetup = do
@@ -73,7 +81,7 @@ getScriptProcessorNode mediaStream = do
   return processor
 
 onAudioProcess
-  :: (ByteString -> IO ())
+  :: (AudioRecordedData -> IO ())
   -> EventM ScriptProcessorNode AudioProcessingEvent ()
 onAudioProcess triggerEvFun = do
   -- putStrLn ("Start Audio Process" :: Protolude.Text)
@@ -82,31 +90,49 @@ onAudioProcess triggerEvFun = do
 
 callBackListener :: MonadDOM m
   => AudioProcessingEvent
-  -> (ByteString -> IO ())
+  -> (AudioRecordedData -> IO ())
   -> m ()
 callBackListener e triggerEvFun = do
   -- getInputBuffer :: MonadDOM m => AudioProcessingEvent -> m AudioBuffer
   buf <- getInputBuffer e
 
   rate <- getSampleRate buf
-  -- putStrLn $ ("Sample Rate:" <> show rate :: Protolude.Text)
-  -- getChannelData :: MonadDOM m => AudioBuffer -> Word -> m ByteString
+  putStrLn $ ("Sample Rate:" <> show rate :: Protolude.Text)
+  -- getChannelData :: MonadDOM m => AudioBuffer -> Word -> m AudioRecordedData
   dd <- getChannelData buf 0
 
+  liftIO $ consoleLog (unFloat32Array dd)
   let
-      dlen = js_float32array_length dd
-      doff = js_float32array_byteoffset dd
-      dbuf = js_float32array_buffer dd
+    -- dbytelen = js_float32array_bytelength dd
+    dlen = js_float32array_length dd
+    doff = js_float32array_byteoffset dd
+    -- dbuf = js_float32array_buffer dd
 
-  --  putStrLn $ ("Dlen:" <> show dlen :: Protolude.Text)
-  let bs = toByteString dlen Nothing (createFromArrayBuffer dbuf)
-  liftIO $ triggerEvFun bs
+  -- putStrLn $ ("Dlen:" <> show dlen :: Protolude.Text)
+
+  let makeVector i = indexArr i dd
+  dvec <- liftIO $ VU.generateM dlen makeVector
+
+  liftIO $ triggerEvFun dvec
 
   -- send wsConn (ArrayBuffer $ unFloat32Array d)
-
+foreign import javascript unsafe "console['log']($1)" consoleLog :: JSVal -> IO ()
 foreign import javascript unsafe
-  "($1).length" js_float32array_length :: Float32Array -> Int
+  "($1).byteLength" js_float32array_length :: Float32Array -> Int
 foreign import javascript unsafe
-  "($1).buffer" js_float32array_buffer :: Float32Array -> TA.ArrayBuffer
+  "($1).byteLength" js_float32array_bytelength :: Float32Array -> Int
+-- foreign import javascript unsafe
+--   "($1).buffer" js_float32array_buffer :: Float32Array -> TA.ArrayBuffer
 foreign import javascript unsafe
   "($1).byteoffset" js_float32array_byteoffset :: Float32Array -> Int
+
+indexArr :: Int -> Float32Array -> IO (Double)
+indexArr = js_indexD
+
+-- indexD :: Int -> Float32Array -> State# s -> (# State# s, Double #)
+-- indexD a i = \s -> js_indexD a i s
+-- {-# INLINE indexD #-}
+
+foreign import javascript unsafe
+  "$2[$1]" js_indexD
+  :: Int -> Float32Array -> IO Double

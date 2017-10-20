@@ -16,11 +16,16 @@ import Control.Monad.Fix
 
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
+import MFCC
+import Data.Aeson
+import qualified Data.ByteString.Lazy as BSL
 
 main = mainWidget $ do
   let url = "ws://localhost:3000/"
   audioEv <- audioCaptureWidget
-  widgetHold (return ()) (audioProcessor <$> audioEv)
+  let conf = WebSocketConfig ((:[]) <$> (BSL.toStrict <$> (encode <$> audioEv))) never True
+  webSocket "ws://localhost:3001/" conf
+  --widgetHold (return ()) (audioProcessor <$> audioEv)
   withWSConnection
     url
     never -- close event
@@ -29,9 +34,10 @@ main = mainWidget $ do
   return ()
 
 -- audioProcessor :: Float32Array -> m ()
-audioProcessor arr = do
-  liftIO $ putStrLn ( "Recieved audioProcessor event" :: Protolude.Text)
-  text $ "audioProcessor: " <> (T.pack $ show (BS.length arr))
+-- audioProcessor arr = do
+--   liftIO $ putStrLn ( "Recieved audioProcessor event" :: Protolude.Text)
+--   let floatArray = parseFloatData arr
+--   liftIO $ putStrLn ( "data:" <> show floatArray :: Protolude.Text)
 
 topWidget
   :: AppMonad t m => AppMonadT t m ()
