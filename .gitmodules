@@ -4,3 +4,6 @@
 [submodule "reflex-websocket-interface"]
 	path = reflex-websocket-interface
 	url = git@github.com:dfordivam/reflex-websocket-interface.git
+[submodule "hsmfcc"]
+	path = hsmfcc
+	url = git@github.com:dfordivam/hsmfcc.git
