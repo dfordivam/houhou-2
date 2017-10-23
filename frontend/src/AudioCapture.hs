@@ -22,6 +22,7 @@ import GHCJS.DOM
 import Language.Javascript.JSaddle.Value
 import Language.Javascript.JSaddle.Types
 import JavaScript.Object
+import Data.IORef
 
 -- import qualified JavaScript.TypedArray as TA
 --import qualified JavaScript.TypedArray.ArrayBuffer as TA
@@ -32,8 +33,7 @@ import Reflex.Dom
 -- import Language.Javascript.JSaddle.Helper (mutableArrayBufferFromJSVal)
 
 import qualified Data.Vector.Unboxed as VU
-
-type AudioRecordedData = VU.Vector Double
+import AudioProcessor
 
 audioCaptureWidget = do
   text "AudioCaptureWidget"
@@ -42,9 +42,10 @@ audioCaptureWidget = do
   let process = do
         mediaStr <- audioSetup
         processor <- getScriptProcessorNode mediaStr
-        remove <- liftIO $ on processor audioProcess (onAudioProcess triggerEvFun)
+        countRef <- liftIO $ newIORef 0
+        remove <- liftIO $ on processor audioProcess (onAudioProcess countRef triggerEvFun)
         putStrLn ("MediaStream Setup Done" :: Protolude.Text)
-        liftIO $ forkIO $ threadDelay 5000000 >> remove
+        liftIO $ forkIO $ threadDelay 10000000 >> remove
         putStrLn ("MediaStream Stopped" :: Protolude.Text)
   process
   return (ev)
@@ -74,30 +75,35 @@ getScriptProcessorNode mediaStream = do
 
   let
     -- 256, 512, 1024, 2048, 4096, 8192 or 16384.
-    bufferSize = 8192
+    bufferSize = 16384
   processor <- createScriptProcessor context bufferSize (Just 1) (Just 1)
 
   connect strSrc processor Nothing Nothing
+  dest <- getDestination context
+  connect processor dest Nothing Nothing
   return processor
 
 onAudioProcess
-  :: (AudioRecordedData -> IO ())
+  :: IORef Int
+  -> (AudioRecordedData -> IO ())
   -> EventM ScriptProcessorNode AudioProcessingEvent ()
-onAudioProcess triggerEvFun = do
+onAudioProcess countRef triggerEvFun = do
   -- putStrLn ("Start Audio Process" :: Protolude.Text)
   aEv <- ask
-  callBackListener aEv triggerEvFun
+  callBackListener aEv countRef triggerEvFun
 
 callBackListener :: MonadDOM m
   => AudioProcessingEvent
+  -> IORef Int
   -> (AudioRecordedData -> IO ())
   -> m ()
-callBackListener e triggerEvFun = do
+callBackListener e countRef triggerEvFun = do
   -- getInputBuffer :: MonadDOM m => AudioProcessingEvent -> m AudioBuffer
   buf <- getInputBuffer e
+  count <- liftIO $ atomicModifyIORef countRef (\c -> (c + 1, c))
 
   rate <- getSampleRate buf
-  putStrLn $ ("Sample Rate:" <> show rate :: Protolude.Text)
+  -- putStrLn $ ("Sample Rate:" <> show rate :: Protolude.Text)
   -- getChannelData :: MonadDOM m => AudioBuffer -> Word -> m AudioRecordedData
   dd <- getChannelData buf 0
 
@@ -108,17 +114,22 @@ callBackListener e triggerEvFun = do
     doff = js_float32array_byteoffset dd
     -- dbuf = js_float32array_buffer dd
 
-  -- putStrLn $ ("Dlen:" <> show dlen :: Protolude.Text)
+  putStrLn $ ("Dlen:" <> show dlen :: Protolude.Text)
+  putStrLn $ ("Count:" <> show count :: Protolude.Text)
 
-  let makeVector i = indexArr i dd
-  dvec <- liftIO $ VU.generateM dlen makeVector
-
-  liftIO $ triggerEvFun dvec
+  let makeVector i = do
+        v <- (indexArr i dd)
+        case v * (2 ^ 15) of
+          0 -> return 0
+          x -> return $ (fromInteger (floor x))
+  dvec <- liftIO $ mapM makeVector [0..(dlen - 1)]
+  putStrLn $ ("Data 0:" <> (show $ length $ filter (== 0) dvec) :: Protolude.Text)
+  liftIO $ triggerEvFun (dvec, count)
 
   -- send wsConn (ArrayBuffer $ unFloat32Array d)
 foreign import javascript unsafe "console['log']($1)" consoleLog :: JSVal -> IO ()
 foreign import javascript unsafe
-  "($1).byteLength" js_float32array_length :: Float32Array -> Int
+  "($1).length" js_float32array_length :: Float32Array -> Int
 foreign import javascript unsafe
   "($1).byteLength" js_float32array_bytelength :: Float32Array -> Int
 -- foreign import javascript unsafe
@@ -128,6 +139,7 @@ foreign import javascript unsafe
 
 indexArr :: Int -> Float32Array -> IO (Double)
 indexArr = js_indexD
+{-# INLINE indexArr #-}
 
 -- indexD :: Int -> Float32Array -> State# s -> (# State# s, Double #)
 -- indexD a i = \s -> js_indexD a i s

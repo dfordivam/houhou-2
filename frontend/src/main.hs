@@ -14,16 +14,19 @@ import qualified Data.Map as Map
 import Control.Lens
 import Control.Monad.Fix
 
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import MFCC
 import Data.Aeson
-import qualified Data.ByteString.Lazy as BSL
+import AudioProcessor
 
 main = mainWidget $ do
   let url = "ws://localhost:3000/"
   audioEv <- audioCaptureWidget
-  let conf = WebSocketConfig ((:[]) <$> (BSL.toStrict <$> (encode <$> audioEv))) never True
+  let conf = WebSocketConfig
+        ((:[]) <$> procAudioEv) never True
+      procAudioEv = processAudio <$> audioEv
   webSocket "ws://localhost:3001/" conf
   --widgetHold (return ()) (audioProcessor <$> audioEv)
   withWSConnection

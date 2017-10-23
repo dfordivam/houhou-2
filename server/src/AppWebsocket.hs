@@ -9,6 +9,7 @@ module AppWebsocket where
 import Protolude
 import Handlers
 import DBInterface (openKanjiDB, openSrsDB)
+import AudioProcessor
 
 import Control.Monad.RWS
 import Data.IORef
@@ -31,7 +32,27 @@ mainWebSocketHandler = do
     HandlerState [] 20 Map.empty Map.empty [] (SrsReviewStats 0 0 0)
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
+  forkIO $ runEnv 3001 audioWebSocket
   runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
+
+audioWebSocket :: Application
+audioWebSocket =
+  websocketsOr defaultConnectionOptions wsApp backupApp
+  where
+    -- wsApp :: ServerApp
+    wsApp pending_conn = do
+      conn <- acceptRequest pending_conn
+      putStrLn ("Opening FIle" :: Text)
+      fh <- openFile "pcmdata2.raw" AppendMode
+      loop conn fh
+
+    loop conn fh = do
+      d <- receiveData conn
+      processAudioData d fh
+      loop conn fh
+
+    backupApp :: Application
+    backupApp _ respond = respond $ responseLBS status400 [] "Not a WebSocket request"
 
 
 app :: IORef HandlerState -> (DB.Connection, DB.Connection) -> Application

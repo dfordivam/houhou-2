@@ -15,6 +15,7 @@ executable         houhou2-frontend
     other-modules:
                 KanjiBrowser
                 AudioCapture
+                AudioProcessor
 
     extensions:
                 OverloadedStrings
@@ -58,6 +59,8 @@ executable         houhou2-frontend
                 , jsaddle
                 , hsmfcc
                 , vector
+                , dsp
+                , binary
 
   if impl(ghcjs)
     build-depends: ghcjs-base

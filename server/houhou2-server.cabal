@@ -23,10 +23,12 @@ executable houhou2-server
 library
   exposed-modules:     Handlers
                        AppWebsocket
+                       AudioProcessor
   other-modules:       Utils
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
+                       OverloadedStrings
   build-depends:       base >=4.9 && <4.10
                      , protolude
                      , warp
@@ -48,6 +50,10 @@ library
                      , pretty-simple
                      , time
                      , random
+                     , dsp
+                     , bytestring
+                     , binary
+                     , vector
 
 test-suite unit
   type: exitcode-stdio-1.0
