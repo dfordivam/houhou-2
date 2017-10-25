@@ -32,18 +32,17 @@ mainWebSocketHandler = do
     HandlerState [] 20 Map.empty Map.empty [] (SrsReviewStats 0 0 0)
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
-  forkIO $ runEnv 3001 audioWebSocket
+  liftIO $ putStrLn ("Opening FIle" :: Text)
+  fh <- liftIO $ openFile "meldata.raw" AppendMode
+  forkIO $ runEnv 3001 $ audioWebSocket fh
   runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
 
-audioWebSocket :: Application
-audioWebSocket =
-  websocketsOr defaultConnectionOptions wsApp backupApp
+audioWebSocket fh = do
+  websocketsOr defaultConnectionOptions (wsApp fh) backupApp
   where
     -- wsApp :: ServerApp
-    wsApp pending_conn = do
+    wsApp fh pending_conn = do
       conn <- acceptRequest pending_conn
-      putStrLn ("Opening FIle" :: Text)
-      fh <- openFile "pcmdata2.raw" AppendMode
       loop conn fh
 
     loop conn fh = do
