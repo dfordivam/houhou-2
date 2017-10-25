@@ -33,7 +33,7 @@ mainWebSocketHandler = do
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
   liftIO $ putStrLn ("Opening FIle" :: Text)
-  fh <- liftIO $ openFile "meldata.raw" AppendMode
+  fh <- liftIO $ openFile "audiodata.raw" AppendMode
   forkIO $ runEnv 3001 $ audioWebSocket fh
   runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
 

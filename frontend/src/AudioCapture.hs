@@ -43,10 +43,10 @@ audioCaptureWidget = do
         mediaStr <- audioSetup
         processor <- getScriptProcessorNode mediaStr
         countRef <- liftIO $ newIORef (0,0)
-        remove <- liftIO $ on processor audioProcess (onAudioProcess countRef triggerEvFun)
-        putStrLn ("MediaStream Setup Done" :: Protolude.Text)
-        liftIO $ forkIO $ threadDelay 10000000 >> remove
-        putStrLn ("MediaStream Stopped" :: Protolude.Text)
+        liftIO $ forkIO $ do
+          threadDelay 10000000
+          remove <- on processor audioProcess (onAudioProcess countRef triggerEvFun)
+          threadDelay 7000000 >> remove
   process
   return (ev)
 
@@ -75,7 +75,7 @@ getScriptProcessorNode mediaStream = do
 
   let
     -- 256, 512, 1024, 2048, 4096, 8192 or 16384.
-    bufferSize = 8192
+    bufferSize = 16384
   processor <- createScriptProcessor context bufferSize (Just 1) (Just 1)
 
   connect strSrc processor Nothing Nothing
@@ -106,7 +106,7 @@ callBackListener e countRef triggerEvFun = do
   -- putStrLn $ ("Sample Rate:" <> show rate :: Protolude.Text)
   dd <- getChannelData buf 0
 
-  liftIO $ consoleLog (unFloat32Array dd)
+  -- liftIO $ consoleLog (unFloat32Array dd)
   let
     -- dbytelen = js_float32array_bytelength dd
     dlen = js_float32array_length dd
@@ -117,10 +117,11 @@ callBackListener e countRef triggerEvFun = do
   putStrLn $ ("Count:" <> show count :: Protolude.Text)
 
   let makeVector i = do
-        v <- (indexArr i dd)
-        return $! v
+        v <- (indexArr (i * 3) dd)
+        return $! (v * 2^15)
+      vecLen = ceiling $ (fromIntegral dlen) / 3
 
-  dvec <- liftIO $ VU.generateM dlen makeVector
+  dvec <- liftIO $ VU.generateM vecLen makeVector
 
   let (b,e) = isValidSample dvec
       (sendData, remN) = if b
@@ -131,9 +132,9 @@ callBackListener e countRef triggerEvFun = do
 
   liftIO $ writeIORef countRef (count + 1, remN)
 
-  putStrLn $ ("Data energy:" <> (show $ e) :: Protolude.Text)
-  when sendData $
-    liftIO $ triggerEvFun (count, downsampleAudio rate dvec)
+  -- putStrLn $ ("Data energy:" <> (show $ e) :: Protolude.Text)
+  -- when sendData $
+  liftIO $ triggerEvFun (count, downsampleAudio rate dvec)
 
   -- send wsConn (ArrayBuffer $ unFloat32Array d)
 foreign import javascript unsafe "console['log']($1)" consoleLog :: JSVal -> IO ()

@@ -26,10 +26,14 @@ processAudio (c, d) = BSL.toStrict $
     melBankData =
       trace ("MelData: " ++ (show $ length melB2)) melB2
 
+sendAudio :: AudioRecordedData -> ByteString
+sendAudio (c,d) = BSL.toStrict $
+  Aeson.encode (c, untag d)
+
 downsampleAudio :: SamplingRate -> VU.Vector Double -> AudioDataFromPCM
-downsampleAudio rate d = Tagged $
-  VU.map (\x -> (x * 2^15)) $
-  downsample 3 d
+downsampleAudio rate d = Tagged $ d
+  -- VU.map (\x -> (x * 2^15)) $ d
+  -- downsample 3 d
   -- Tagged $ VU.map (\x -> (x * 2^15) / 9)
   --   $ downsample 20 $ cic_interpolate 9 1 2 $ d
 
