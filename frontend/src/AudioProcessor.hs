@@ -8,7 +8,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector.Unboxed as VU
 import MFCC
 import Data.Tagged
-import Data.Aeson as Aeson
+import qualified Data.Aeson as Aeson
 
 type SamplingRate = Float
 type AudioRecordedData = (Int, AudioDataFromPCM)
@@ -28,7 +28,10 @@ processAudio (c, d) = BSL.toStrict $
 
 sendAudio :: AudioRecordedData -> ByteString
 sendAudio (c,d) = BSL.toStrict $
-  Aeson.encode (c, untag d)
+  encode (c, floatD)
+  where
+    floatD :: [Float]
+    floatD = map realToFrac $ VU.toList $ untag d
 
 downsampleAudio :: SamplingRate -> VU.Vector Double -> AudioDataFromPCM
 downsampleAudio rate d = Tagged $ d

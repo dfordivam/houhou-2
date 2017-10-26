@@ -33,11 +33,12 @@ mainWebSocketHandler = do
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
   liftIO $ putStrLn ("Opening FIle" :: Text)
-  fh <- liftIO $ openFile "audiodata.raw" AppendMode
-  forkIO $ runEnv 3001 $ audioWebSocket fh
+  fh <- liftIO $ openFile "meldata.raw" AppendMode
+  melDataRef <- liftIO $ newIORef ""
+  forkIO $ runEnv 3001 $ audioWebSocket fh melDataRef
   runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
 
-audioWebSocket fh = do
+audioWebSocket fh melDataRef = do
   websocketsOr defaultConnectionOptions (wsApp fh) backupApp
   where
     -- wsApp :: ServerApp
@@ -47,7 +48,7 @@ audioWebSocket fh = do
 
     loop conn fh = do
       d <- receiveData conn
-      processAudioData d fh
+      processAudioData d fh melDataRef
       loop conn fh
 
     backupApp :: Application

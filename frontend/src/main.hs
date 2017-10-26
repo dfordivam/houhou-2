@@ -27,7 +27,7 @@ main = mainWidget $ do
   let conf = WebSocketConfig
         ((:[]) <$> procAudioEv) never True
       procAudioEv = traceEventWith (\bs -> "Processed Event" <> (show $ BS.length bs))
-        $ sendAudio <$> audioEv
+        $ processAudio <$> audioEv
   webSocket "ws://localhost:3001/" conf
   --widgetHold (return ()) (audioProcessor <$> audioEv)
   withWSConnection

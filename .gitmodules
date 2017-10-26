@@ -7,3 +7,9 @@
 [submodule "hsmfcc"]
 	path = hsmfcc
 	url = git@github.com:dfordivam/hsmfcc.git
+[submodule "hsjulius"]
+	path = hsjulius
+	url = git@github.com:dfordivam/hsjulius.git
+[submodule "julius"]
+	path = julius
+	url = git@github.com:dfordivam/julius.git

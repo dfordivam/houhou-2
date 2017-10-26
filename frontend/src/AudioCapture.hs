@@ -46,7 +46,7 @@ audioCaptureWidget = do
         liftIO $ forkIO $ do
           threadDelay 10000000
           remove <- on processor audioProcess (onAudioProcess countRef triggerEvFun)
-          threadDelay 7000000 >> remove
+          threadDelay 3000000 >> remove
   process
   return (ev)
 

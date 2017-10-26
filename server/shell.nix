@@ -25,10 +25,15 @@ let
   reflex-websocket-interface-shared = ghc.callPackage ../reflex-websocket-interface/shared {};
   reflex-websocket-interface-server = ghc.callPackage ../reflex-websocket-interface/server {inherit reflex-websocket-interface-shared;};
 
+
+  julius = ghc.callPackage ../julius {};
+  hsjulius = ghc.callPackage ../hsjulius {inherit julius pretty-simple;};
+
   drv = ghc.callPackage (ghc.haskellSrc2nix
   {name = "houhou2-server";
   src = ./.;}) {
-    inherit dbmodel dbinterface houhou2-shared reflex-websocket-interface-shared reflex-websocket-interface-server pretty-simple;
+    inherit dbmodel dbinterface houhou2-shared reflex-websocket-interface-shared
+    reflex-websocket-interface-server pretty-simple hsjulius;
     };
 
 in
