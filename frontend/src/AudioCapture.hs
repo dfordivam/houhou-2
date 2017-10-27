@@ -28,20 +28,37 @@ import Reflex.Dom
 import qualified Data.Vector.Unboxed as VU
 import AudioProcessor
 
-audioCaptureWidget = do
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+
+audioCaptureWidget recordEv = do
   text "AudioCaptureWidget"
-  liftIO $ putStrLn ( "testing" :: Protolude.Text)
   (ev, triggerEvFun) <- newTriggerEvent
   let process = do
         mediaStr <- audioSetup
-        processor <- getScriptProcessorNode mediaStr
+        (processor, audioCtxt) <- getScriptProcessorNode mediaStr
         countRef <- liftIO $ newIORef (0,0)
-        liftIO $ forkIO $ do
-          threadDelay 10000000
-          remove <- on processor audioProcess (onAudioProcess countRef triggerEvFun)
-          threadDelay 3000000 >> remove
-  process
-  return (ev)
+        suspend audioCtxt
+        liftIO $
+          on processor audioProcess (onAudioProcess countRef triggerEvFun)
+        return audioCtxt
+
+      toggleFun audioCtxt = liftIO $ do
+        resume audioCtxt
+        threadDelay 3000000
+        suspend audioCtxt
+
+  audioCtxt <- process
+
+  performEvent $ (toggleFun audioCtxt <$ recordEv)
+
+  let conf = WebSocketConfig
+        ((:[]) <$> procAudioEv) never True
+      procAudioEv = traceEventWith (\bs -> "Processed Event" <> (show $ BS.length bs))
+        $ processAudio <$> ev
+  webSocket "ws://localhost:3001/" conf
+  return ()
 
 audioSetup :: MonadDOM m => m (MediaStream)
 audioSetup = do
@@ -59,7 +76,7 @@ audioSetup = do
   let constraints = MediaStreamConstraints v
   GHCJS.DOM.MediaDevices.getUserMedia devices (Just constraints)
 
-getScriptProcessorNode :: MonadDOM m => MediaStream -> m (ScriptProcessorNode)
+getScriptProcessorNode :: MonadDOM m => MediaStream -> m (ScriptProcessorNode, AudioContext)
 getScriptProcessorNode mediaStream = do
   -- newAudioContext :: MonadDOM m => m AudioContext
   context <- newAudioContext
@@ -74,7 +91,7 @@ getScriptProcessorNode mediaStream = do
   connect strSrc processor Nothing Nothing
   dest <- getDestination context
   connect processor dest Nothing Nothing
-  return processor
+  return (processor, context)
 
 onAudioProcess
   :: IORef (Int, Int)

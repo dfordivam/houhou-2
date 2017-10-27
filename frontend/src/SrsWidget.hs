@@ -1,6 +1,7 @@
 module SrsWidget where
 
 import FrontendCommon
+import AudioCapture
 
 import qualified Data.Text as T
 import qualified Data.Set as Set
@@ -411,6 +412,9 @@ reviewWidget = do
   closeEv <- elAttr "div" attr $ divClass "column" $ do
     closeEv <- divClass "fluid" $
       uiButton (constDyn def) (text "Close Review")
+
+    recordEv <- uiButton (constDyn def) (text "Record")
+    audioCaptureWidget recordEv
 
     rec
       let reviewItemEv = fmapMaybeCheap identity $

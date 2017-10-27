@@ -11,18 +11,9 @@ import Control.Lens.Indexed
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
-import MFCC
-import Data.Aeson
-import AudioProcessor
 
 main = mainWidget $ do
   let url = "ws://localhost:3000/"
-  audioEv <- audioCaptureWidget
-  let conf = WebSocketConfig
-        ((:[]) <$> procAudioEv) never True
-      procAudioEv = traceEventWith (\bs -> "Processed Event" <> (show $ BS.length bs))
-        $ processAudio <$> audioEv
-  webSocket "ws://localhost:3001/" conf
   --widgetHold (return ()) (audioProcessor <$> audioEv)
   withWSConnection
     url
