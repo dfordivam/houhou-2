@@ -16,6 +16,8 @@ executable         houhou2-frontend
                 KanjiBrowser
                 AudioCapture
                 AudioProcessor
+                SrsWidget
+                FrontendCommon
 
     extensions:
                 OverloadedStrings
@@ -31,8 +33,11 @@ executable         houhou2-frontend
                 ViewPatterns
                 TupleSections
                 RecordWildCards
-                CPP
                 NoImplicitPrelude
+                RecursiveDo
+                ConstraintKinds
+               PartialTypeSignatures
+                ScopedTypeVariables
 
     build-depends:
                   base

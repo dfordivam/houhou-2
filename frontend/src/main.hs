@@ -1,18 +1,12 @@
-{-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-import Protolude hiding (link)
-import Reflex.Dom
 import KanjiBrowser
+import SrsWidget
 import AudioCapture
+import FrontendCommon
 
-import Reflex.Dom.WebSocket.Monad
-import Reflex.Dom.WebSocket.Message
-import Reflex.Dom.SemanticUI
-import Message (AppRequest)
-import Control.Monad.Primitive
 import qualified Data.Map as Map
-import Control.Lens
-import Control.Monad.Fix
+import qualified Data.Text as T
+import qualified Data.Set as Set
+import Control.Lens.Indexed
 
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString as BS

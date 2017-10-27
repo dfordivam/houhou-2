@@ -31,7 +31,7 @@ type AppRequest =
 ----------------------------------------------------------------
 data KanjiFilter = KanjiFilter
   { textContent :: Text
-  , filter :: Filter
+  , kanjiFilter :: Filter
   , selectedRadicals :: [RadicalId]
   }
   deriving (Generic, Show)
