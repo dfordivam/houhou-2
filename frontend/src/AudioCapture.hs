@@ -2,7 +2,6 @@ module AudioCapture where
 
 import Protolude hiding (on)
 
-import Control.Monad.Primitive
 import qualified Data.Map as Map
 import Control.Lens
 import Control.Monad.Fix
@@ -24,13 +23,7 @@ import Language.Javascript.JSaddle.Types
 import JavaScript.Object
 import Data.IORef
 
--- import qualified JavaScript.TypedArray as TA
---import qualified JavaScript.TypedArray.ArrayBuffer as TA
--- import GHCJS.Buffer (toByteString, createFromArrayBuffer)
-
 import Reflex.Dom
--- import Foreign.JavaScript.Utils (bsFromMutableArrayBuffer)
--- import Language.Javascript.JSaddle.Helper (mutableArrayBufferFromJSVal)
 
 import qualified Data.Vector.Unboxed as VU
 import AudioProcessor
@@ -98,27 +91,26 @@ callBackListener :: MonadDOM m
   -> (AudioRecordedData -> IO ())
   -> m ()
 callBackListener e countRef triggerEvFun = do
-  -- getInputBuffer :: MonadDOM m => AudioProcessingEvent -> m AudioBuffer
   buf <- getInputBuffer e
   (count, rem) <- liftIO $ readIORef countRef
 
+  -- TODO Use the sample rate
   rate <- getSampleRate buf
   -- putStrLn $ ("Sample Rate:" <> show rate :: Protolude.Text)
   dd <- getChannelData buf 0
 
   -- liftIO $ consoleLog (unFloat32Array dd)
   let
-    -- dbytelen = js_float32array_bytelength dd
     dlen = js_float32array_length dd
-    doff = js_float32array_byteoffset dd
-    -- dbuf = js_float32array_buffer dd
 
   putStrLn $ ("Dlen:" <> show dlen :: Protolude.Text)
   putStrLn $ ("Count:" <> show count :: Protolude.Text)
 
   let makeVector i = do
         v <- (indexArr (i * 3) dd)
+        -- Change the range from -1, 1 to 16 bit pcm
         return $! (v * 2^15)
+      -- Downsample 48kHz to 16kHz
       vecLen = ceiling $ (fromIntegral dlen) / 3
 
   dvec <- liftIO $ VU.generateM vecLen makeVector
@@ -136,25 +128,53 @@ callBackListener e countRef triggerEvFun = do
   -- when sendData $
   liftIO $ triggerEvFun (count, downsampleAudio rate dvec)
 
-  -- send wsConn (ArrayBuffer $ unFloat32Array d)
-foreign import javascript unsafe "console['log']($1)" consoleLog :: JSVal -> IO ()
+-- foreign import javascript unsafe "console['log']($1)" consoleLog :: JSVal -> IO ()
 foreign import javascript unsafe
   "($1).length" js_float32array_length :: Float32Array -> Int
-foreign import javascript unsafe
-  "($1).byteLength" js_float32array_bytelength :: Float32Array -> Int
--- foreign import javascript unsafe
---   "($1).buffer" js_float32array_buffer :: Float32Array -> TA.ArrayBuffer
-foreign import javascript unsafe
-  "($1).byteoffset" js_float32array_byteoffset :: Float32Array -> Int
 
 indexArr :: Int -> Float32Array -> IO (Double)
 indexArr = js_indexD
 {-# INLINE indexArr #-}
 
--- indexD :: Int -> Float32Array -> State# s -> (# State# s, Double #)
--- indexD a i = \s -> js_indexD a i s
--- {-# INLINE indexD #-}
-
 foreign import javascript unsafe
   "$2[$1]" js_indexD
   :: Int -> Float32Array -> IO Double
+
+-- Multirate Downsampling code
+-- Code copied from dsp package and enhanced for Unboxed Vector usage
+cic_interpolate :: Int -> Int -> Int -> VU.Vector Double -> VU.Vector Double
+cic_interpolate r m n vec =
+  case VU.length vec of
+    0 -> vec
+    _ -> ((integrate_chain n) . (upsampleV r) . (comb_chain m n)) vec
+  where
+    integrate_chain n = apply integrateV n
+    comb_chain m n = apply (combV m) n
+
+    combV :: Int -> VU.Vector Double -> VU.Vector Double
+    combV m vec = VU.zipWith (-) vec delayedVec
+      where delayedVec = (VU.++) (VU.replicate m 0.0) vec
+
+    integrateV :: VU.Vector Double -> VU.Vector Double
+    integrateV vec = VU.postscanl' (+) 0 vec
+
+    -- | @upsample@ inserts n-1 zeros between each sample, eg,
+    --
+    -- @upsample 2 [ 1, 2, 3 ] == [ 1, 0, 2, 0, 3, 0 ]@
+
+    upsampleV :: Int -> VU.Vector Double -> VU.Vector Double
+    upsampleV n vec = VU.update zeroVec indVec
+      where zeroVec = VU.replicate (n * (VU.length vec)) 0.0
+            indVec = VU.imap (\i a -> (n * i, a)) vec
+
+    apply :: (a -> a) -> Int -> (a -> a)
+    apply f 1 = f
+    apply f n = f . apply f (n - 1)
+
+-- | @downsample@ throws away every n'th sample, eg,
+--
+-- @downsample 2 [ 1, 2, 3, 4, 5, 6 ] == [ 1, 3, 5 ]@
+
+downsample n vec = VU.generate len genF
+  where len = floor ((fromIntegral $ VU.length vec)/(fromIntegral n))
+        genF i = (VU.!) vec (i * n)
