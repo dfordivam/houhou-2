@@ -23,7 +23,7 @@ import Language.Javascript.JSaddle.Types
 import JavaScript.Object
 import Data.IORef
 
-import Reflex.Dom
+import FrontendCommon
 
 import qualified Data.Vector.Unboxed as VU
 import AudioProcessor
@@ -31,6 +31,8 @@ import AudioProcessor
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
+import Data.These
+import Data.Align
 
 audioCaptureWidget recordEv = do
   text "AudioCaptureWidget"
@@ -40,24 +42,50 @@ audioCaptureWidget recordEv = do
         (processor, audioCtxt) <- getScriptProcessorNode mediaStr
         countRef <- liftIO $ newIORef (0,0)
         suspend audioCtxt
-        liftIO $
-          on processor audioProcess (onAudioProcess countRef triggerEvFun)
+        liftIO $ GHCJS.DOM.EventM.on processor audioProcess
+            (onAudioProcess countRef triggerEvFun)
         return audioCtxt
 
       toggleFun audioCtxt = liftIO $ do
         resume audioCtxt
         threadDelay 3000000
         suspend audioCtxt
+        putStrLn $
+          ("Doing Suspend" :: Protolude.Text)
 
   audioCtxt <- process
 
-  performEvent $ (toggleFun audioCtxt <$ recordEv)
+  endEv <-
+    performEvent $ (toggleFun audioCtxt <$ recordEv)
 
-  let conf = WebSocketConfig
-        ((:[]) <$> procAudioEv) never True
-      procAudioEv = traceEventWith (\bs -> "Processed Event" <> (show $ BS.length bs))
-        $ processAudio <$> ev
-  webSocket "ws://localhost:3001/" conf
+  delayedEndEv <- delay 3.0 endEv
+  performEvent $
+    putStrLn ("Sampling data..." :: T.Text)
+     <$ delayedEndEv
+  deleteEv <- delay 3.0 delayedEndEv
+  performEvent $
+    putStrLn ("Deleting data..." :: T.Text)
+     <$ deleteEv
+  let audioDataEv = computeMel <$> ev
+      combEv = align audioDataEv deleteEv
+      foldFun (This ad) d = d ++ ad
+      foldFun _ d = []
+
+  audioDataDyn <- foldDyn foldFun [] combEv
+
+  let dataEv = tagPromptlyDyn audioDataDyn delayedEndEv
+      intDataEv = (map (\f -> floor $ f * 100000)) <$> dataEv
+
+  resp <- getWebSocketResponse
+    $ CheckAnswerAudio "dummytext" <$> intDataEv
+
+  widgetHold (text "Waiting for ASR Resp") $
+    (\t -> text $ T.pack $ show t) <$> resp
+  -- let conf = WebSocketConfig
+  --       ((:[]) <$> procAudioEv) never True
+  --     procAudioEv = traceEventWith (\bs -> "Processed Event" <> (show $ BS.length bs))
+  --       $ processAudio <$> ev
+  -- webSocket "ws://localhost:3001/" conf
   return ()
 
 audioSetup :: MonadDOM m => m (MediaStream)
@@ -141,6 +169,7 @@ callBackListener e countRef triggerEvFun = do
 
   liftIO $ writeIORef countRef (count + 1, remN)
 
+  putStrLn $ ("Sending Audio Ev:" :: Protolude.Text)
   -- putStrLn $ ("Data energy:" <> (show $ e) :: Protolude.Text)
   -- when sendData $
   liftIO $ triggerEvFun (count, downsampleAudio rate dvec)

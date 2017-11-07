@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Message
   where
 
@@ -23,6 +24,7 @@ type AppRequest =
   :<|> GetSrsStats
   :<|> BrowseSrsItems
   :<|> GetNextReviewItem
+  :<|> CheckAnswerAudio
   :<|> DoReview
   :<|> GetSrsItem
   :<|> EditSrsItem
@@ -112,6 +114,18 @@ data GetNextReviewItem = GetNextReviewItem
 instance WebSocketMessage AppRequest GetNextReviewItem where
   type ResponseT AppRequest GetNextReviewItem
     = Maybe ReviewItem
+
+data CheckAnswerAudio =
+  CheckAnswerAudio ReadingT [Int]
+  deriving (Generic, Show, ToJSON, FromJSON)
+
+data CheckAnswerAudioResult
+  = AnswerCorrect
+  | AnswerIncorrect Text
+  deriving (Generic, Show, ToJSON, FromJSON)
+
+instance WebSocketMessage AppRequest CheckAnswerAudio where
+  type ResponseT AppRequest CheckAnswerAudio = CheckAnswerAudioResult
 
 ----------------------------------------------------------------
 data DoReview

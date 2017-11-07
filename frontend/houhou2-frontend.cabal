@@ -68,6 +68,7 @@ executable         houhou2-frontend
                 , binary
                 , vector-binary-instances
                 , tagged
+                , these
 
   if impl(ghcjs)
     build-depends: ghcjs-base

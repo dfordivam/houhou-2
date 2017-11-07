@@ -22,6 +22,12 @@ processAudio (c, d) = BSL.toStrict $
     melBankData =
       trace ("MelData: " ++ (show $ length melB2)) melB2
 
+computeMel :: AudioRecordedData -> [Float]
+computeMel (c,d) = fmap realToFrac $
+  mconcat $ filter (\v -> not $ any
+     (\f -> (f < 0) || isNaN f || (not $ isIEEE f)) v)
+  $ fmap VU.toList $ topAPI d
+
 sendAudio :: AudioRecordedData -> ByteString
 sendAudio (c,d) = BSL.toStrict $
   encode (c, floatD)

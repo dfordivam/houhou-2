@@ -1,6 +1,9 @@
 module AudioProcessor where
 
 import Protolude
+import Message
+import Utils
+
 
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString as BS
@@ -17,10 +20,16 @@ import qualified Data.Vector.Unboxed as VU
 import Data.IORef
 import Text.Pretty.Simple
 
-type SamplingRate = Int
-type MelFilterBank = [Double]
-type DataFromClient = (Int, [MelFilterBank])
-type AudioFromClient = (Int, [Float])
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Vector as V
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as TL
+
+-- type SamplingRate = Int
+-- type MelFilterBank = [Double]
+-- type DataFromClient = (Int, [MelFilterBank])
+-- type AudioFromClient = (Int, [Float])
 
 -- processAudioData :: ByteString -> Handle -> IO ()
 -- processAudioData bs fh = do
@@ -37,35 +46,57 @@ type AudioFromClient = (Int, [Float])
 --   mapM_ (BSL.hPut fh) ((toLazyByteString . execPut) <$> (buil audioD))
 --   return ()
 
-processAudioData :: ByteString -> Handle -> IORef ByteString -> IO ()
-processAudioData bs fh melDataRef = do
-  let d = Aeson.decode (BSL.fromStrict bs) :: Maybe DataFromClient
-      count = fst <$> d
-      melD = snd <$> d
-  putStrLn $ ("Got Data:" <> show count :: Text)
+-- processAudioData :: ByteString -> Handle -> IORef ByteString -> IO ()
+-- processAudioData bs fh melDataRef = do
+--   let d = Aeson.decode (BSL.fromStrict bs) :: Maybe DataFromClient
+--       count = fst <$> d
+--       melD = snd <$> d
+--   putStrLn $ ("Got Data:" <> show count :: Text)
 
-  let
-    buil (Just melVs) = Just $ mconcat (map melBuil melVs)
-    buil Nothing = Nothing
-    melBuil melV = mconcat $ map putFloat32le $ map realToFrac melV
+--   let
+--     buil (Just melVs) = Just $ mconcat (map melBuil melVs)
+--     buil Nothing = Nothing
+--     melBuil melV = mconcat $ map putFloat32le $ map realToFrac melV
 
-  appendFile "data" (show melD)
-  putStrLn $ ("Got Data:" <> show (fmap (fmap length) (melD)) :: Text)
-  let bsData = maybe "" (BSL.toStrict)
-        $ (toLazyByteString . execPut) <$> (buil melD)
+--   appendFile "data" (show melD)
+--   putStrLn $ ("Got Data:" <> show (fmap (fmap length) (melD)) :: Text)
+--   let bsData = maybe "" (BSL.toStrict)
+--         $ (toLazyByteString . execPut) <$> (buil melD)
 
-  modifyIORef' melDataRef (\d -> BS.append d bsData)
-  bsAll <- readIORef melDataRef
-  when (BS.length bsAll > 39000)
-    $ doAsr bsAll >> writeIORef melDataRef ""
+--   modifyIORef' melDataRef (\d -> BS.append d bsData)
+--   bsAll <- readIORef melDataRef
+--   when (BS.length bsAll > 39000)
+--     $ doAsr bsAll >> writeIORef melDataRef ""
 
-  mapM_ (BSL.hPut fh) ((toLazyByteString . execPut) <$> (buil melD))
-  return ()
+--   mapM_ (BSL.hPut fh) ((toLazyByteString . execPut) <$> (buil melD))
+--   return ()
 
-doAsr bsAll = do
-  v <- c_init_julius
-  confData <- computeConfusionDataFromMelData v bsAll
-  pPrint confData
+getCheckAnswerAudio :: CheckAnswerAudio
+  -> HandlerM CheckAnswerAudioResult
+getCheckAnswerAudio (CheckAnswerAudio reading audioData) = do
+  let melBsBuil = mconcat $ map putFloat32le
+        $ map (\i -> (fromIntegral i) / 100000) $ audioData
+      melBs = BSL.toStrict $ (toLazyByteString . execPut) melBsBuil
+  v <- asks asrEngine
+  confData <- liftIO $ computeConfusionDataFromMelData v melBs
+  let found = V.any (any (\(_,s) -> (T.unpack reading) == s)) confData
+  liftIO $ T.putStrLn $ showConfData confData
+  return $ if found
+    then AnswerCorrect
+    else AnswerIncorrect $ showConfData confData
+
+showConfData :: ConfusionData -> Text
+showConfData cd = T.unlines $ V.toList $ V.imap f cd
+  where
+    f i ne = "Row " <> tshow i <> ": " <> showNE ne
+    showNE :: NE.NonEmpty (Float, [Char]) -> Text
+    showNE ne = mconcat $ NE.toList $
+      map (\(f,s) -> " <" <> tshow f
+        <>  ", " <> T.pack s <> " >, ") ne
+
+tshow :: (Show s) => s -> Text
+tshow = T.pack . show
+
 -- doDecode :: ByteString -> AudioRecordedData
 -- doDecode bs = loop bs
 --   where loop bs = case f bs of

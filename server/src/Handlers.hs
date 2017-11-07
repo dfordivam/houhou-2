@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -11,8 +10,6 @@ import Protolude hiding ((&))
 import Control.Lens
 import qualified Model as DB
 import Model hiding (KanjiId, KanjiT, VocabT)
-import Control.Monad.RWS
-import Database.SQLite.Simple
 import Message
 import Common
 import DBInterface
@@ -25,39 +22,16 @@ import Data.Time.Calendar
 import Text.Pretty.Simple
 import System.Random
 
-type HandlerM = RWST (Connection,Connection) () HandlerState IO
-
-data ReviewStatus =
-  ReviewPending | ReviewFailure
-  deriving (Eq)
-
--- Nothing -> Both reviews pending
-type ReviewState = (Maybe ReviewType, ReviewStatus)
-
-data HandlerState = HandlerState
-  { _kanjiSearchResult :: [DB.Kanji]
-  , _kanjiDisplayCount :: Int
-  , _srsEntries :: Map SrsEntryId SrsEntry
-  , _reviewQueue :: Map SrsEntryId ReviewState
-  , _undoQueue :: [(Maybe SrsEntry, SrsEntryId
-                   , ReviewState, ReviewType)]
-  , _reviewStats :: SrsReviewStats
-  }
-
-reviewQueueLength = 10
-undoQueueLength = 20
-makeLenses ''HandlerState
-
 runKanjiDB :: (DBMonad a) -> HandlerM a
 runKanjiDB f = do
-  conn <- ask
-  res <- liftIO $ runReaderT f (fst conn)
+  conn <- asks kanjiDbConn
+  res <- liftIO $ runReaderT f conn
   return res
 
 runSrsDB :: (DBMonad a) -> HandlerM a
 runSrsDB f = do
-  conn <- ask
-  res <- liftIO $ runReaderT f (snd conn)
+  conn <- asks srsDbConn
+  res <- liftIO $ runReaderT f conn
   return res
 
 -- Pagination,

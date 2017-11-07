@@ -10,6 +10,7 @@ import Protolude
 import Handlers
 import DBInterface (openKanjiDB, openSrsDB)
 import AudioProcessor
+import Utils
 
 import Control.Monad.RWS
 import Data.IORef
@@ -25,6 +26,7 @@ import qualified Message
 import Network.HTTP.Types.Status
 import qualified Data.Map as Map
 import Common (SrsReviewStats(..))
+import NLP.Julius.Interface (c_init_julius)
 
 mainWebSocketHandler :: IO ()
 mainWebSocketHandler = do
@@ -32,31 +34,30 @@ mainWebSocketHandler = do
     HandlerState [] 20 Map.empty Map.empty [] (SrsReviewStats 0 0 0)
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
-  liftIO $ putStrLn ("Opening FIle" :: Text)
-  fh <- liftIO $ openFile "meldata.raw" AppendMode
-  melDataRef <- liftIO $ newIORef ""
-  forkIO $ runEnv 3001 $ audioWebSocket fh melDataRef
-  runEnv 3000 (app handlerStateRef (dbConn, srsDbConn))
+  asrEng <- c_init_julius
+  let handlerEnv = HandlerEnv dbConn srsDbConn asrEng
+  runEnv 3000 (app handlerStateRef handlerEnv)
 
-audioWebSocket fh melDataRef = do
-  websocketsOr defaultConnectionOptions (wsApp fh) backupApp
-  where
-    -- wsApp :: ServerApp
-    wsApp fh pending_conn = do
-      conn <- acceptRequest pending_conn
-      loop conn fh
+-- audioWebSocket fh melDataRef = do
+--   websocketsOr defaultConnectionOptions (wsApp fh) backupApp
+--   where
+--     -- wsApp :: ServerApp
+--     wsApp fh pending_conn = do
+--       conn <- acceptRequest pending_conn
+--       loop conn fh
 
-    loop conn fh = do
-      d <- receiveData conn
-      processAudioData d fh melDataRef
-      loop conn fh
+--     loop conn fh = do
+--       d <- receiveData conn
+--       processAudioData d fh melDataRef
+--       loop conn fh
 
-    backupApp :: Application
-    backupApp _ respond = respond $ responseLBS status400 [] "Not a WebSocket request"
+--     backupApp :: Application
+--     backupApp _ respond = respond $ responseLBS status400 [] "Not a WebSocket request"
 
 
-app :: IORef HandlerState -> (DB.Connection, DB.Connection) -> Application
-app handlerStateRef dbConn =
+app :: IORef HandlerState
+  -> HandlerEnv -> Application
+app handlerStateRef handlerEnv =
   websocketsOr defaultConnectionOptions wsApp backupApp
   where
     -- wsApp :: ServerApp
@@ -66,12 +67,13 @@ app handlerStateRef dbConn =
 
     loop conn = do
       d <- receiveData conn
-      print d
+      -- print d
       let
           rwst = handleRequest handler d
 
       hState <- readIORef handlerStateRef
-      (resp, newState, _) <- runRWST rwst dbConn hState
+      (resp, newState, _) <-
+        runRWST rwst handlerEnv hState
       writeIORef handlerStateRef newState
 
       print resp
@@ -90,6 +92,7 @@ handler = HandlerWrapper $
   :<&> h getSrsStats
   :<&> h getBrowseSrsItems
   :<&> h getGetNextReviewItem
+  :<&> h getCheckAnswerAudio
   :<&> h getDoReview
   :<&> h getSrsItem
   :<&> h getEditSrsItem

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Utils where
 
 import Protolude
@@ -10,6 +11,40 @@ import qualified Model as DB
 import Model hiding (KanjiId, KanjiT, VocabT, Kanji)
 import Text.Pretty.Simple
 import Control.Exception (assert)
+
+import Control.Monad.RWS
+import Database.SQLite.Simple
+import NLP.Julius.Interface
+
+type HandlerM = RWST HandlerEnv () HandlerState IO
+
+data HandlerEnv = HandlerEnv
+  { kanjiDbConn :: Connection
+  , srsDbConn :: Connection
+  , asrEngine :: RecogMainPtr
+  }
+
+
+data ReviewStatus =
+  ReviewPending | ReviewFailure
+  deriving (Eq)
+
+-- Nothing -> Both reviews pending
+type ReviewState = (Maybe ReviewType, ReviewStatus)
+
+data HandlerState = HandlerState
+  { _kanjiSearchResult :: [DB.Kanji]
+  , _kanjiDisplayCount :: Int
+  , _srsEntries :: Map SrsEntryId SrsEntry
+  , _reviewQueue :: Map SrsEntryId ReviewState
+  , _undoQueue :: [(Maybe SrsEntry, SrsEntryId
+                   , ReviewState, ReviewType)]
+  , _reviewStats :: SrsReviewStats
+  }
+
+reviewQueueLength = 10 :: Int
+undoQueueLength = 20 :: Int
+makeLenses ''HandlerState
 
 -- Hiragana ( 3040 - 309f)
 -- Katakana ( 30a0 - 30ff)
