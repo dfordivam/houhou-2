@@ -13,3 +13,6 @@
 [submodule "julius"]
 	path = julius
 	url = git@github.com:dfordivam/julius.git
+[submodule "hsmecab"]
+	path = hsmecab
+	url = git@github.com:dfordivam/hsmecab.git

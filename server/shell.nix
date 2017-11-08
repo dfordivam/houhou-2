@@ -29,11 +29,13 @@ let
   julius = ghc.callPackage ../julius {};
   hsjulius = ghc.callPackage ../hsjulius {inherit julius pretty-simple;};
 
+  hsmecab = ghc.callPackage ../hsmecab {inherit (pkgs) mecab;};
+
   drv = ghc.callPackage (ghc.haskellSrc2nix
   {name = "houhou2-server";
   src = ./.;}) {
     inherit dbmodel dbinterface houhou2-shared reflex-websocket-interface-shared
-    reflex-websocket-interface-server pretty-simple hsjulius;
+    reflex-websocket-interface-server pretty-simple hsjulius hsmecab;
     };
 
 in

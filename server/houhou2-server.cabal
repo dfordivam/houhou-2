@@ -57,6 +57,7 @@ library
                      , vector-binary-instances
                      , data-binary-ieee754
                      , hsjulius
+                     , hsmecab
 
 test-suite unit
   type: exitcode-stdio-1.0
