@@ -58,6 +58,7 @@ library
                      , data-binary-ieee754
                      , hsjulius
                      , hsmecab
+                     , romkan
 
 test-suite unit
   type: exitcode-stdio-1.0

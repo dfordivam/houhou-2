@@ -21,6 +21,8 @@ import Data.Time.Clock
 import Data.Time.Calendar
 import Text.Pretty.Simple
 import System.Random
+import Text.MeCab
+import NLP.Romkan
 
 runKanjiDB :: (DBMonad a) -> HandlerM a
 runKanjiDB f = do
@@ -637,3 +639,25 @@ getNextReviewDate
 
     (7,True) -> addDay 120
     _ -> curTime -- error
+
+getCheckAnswer :: CheckAnswer -> HandlerM CheckAnswerResult
+getCheckAnswer (CheckAnswer reading alt) = do
+  pPrint alt
+  let  f (c,t) = (,) <$> pure c <*> getKana t
+  kanas <- mapM (mapM f) alt
+  pPrint kanas
+  return $ AnswerCorrect
+
+-- Convert Kanji to furigana (hiragana)
+getKana :: Text -> HandlerM (Text)
+getKana t = do
+  m <- asks mecab
+  nodes <- liftIO $ parseToNodes m t
+  let feats = map nodeFeature nodes
+      -- get the last part of the mecab output, this will include '*'
+      readings :: [Text]
+      readings = catMaybes $ map (headMay . reverse . (T.splitOn ",")) feats
+      -- convert valid characters to hiragana
+      f = map (toHiragana . toRoma) $ filter isJP readings
+
+  return $ mconcat f

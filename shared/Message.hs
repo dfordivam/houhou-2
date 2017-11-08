@@ -25,6 +25,7 @@ type AppRequest =
   :<|> BrowseSrsItems
   :<|> GetNextReviewItem
   :<|> CheckAnswerAudio
+  :<|> CheckAnswer
   :<|> DoReview
   :<|> GetSrsItem
   :<|> EditSrsItem
@@ -115,17 +116,26 @@ instance WebSocketMessage AppRequest GetNextReviewItem where
   type ResponseT AppRequest GetNextReviewItem
     = Maybe ReviewItem
 
+----------------------------------------------------------------
 data CheckAnswerAudio =
   CheckAnswerAudio ReadingT [Int]
   deriving (Generic, Show, ToJSON, FromJSON)
 
-data CheckAnswerAudioResult
+data CheckAnswerResult
   = AnswerCorrect
   | AnswerIncorrect Text
   deriving (Generic, Show, ToJSON, FromJSON)
 
 instance WebSocketMessage AppRequest CheckAnswerAudio where
-  type ResponseT AppRequest CheckAnswerAudio = CheckAnswerAudioResult
+  type ResponseT AppRequest CheckAnswerAudio = CheckAnswerResult
+
+----------------------------------------------------------------
+data CheckAnswer =
+  CheckAnswer ReadingT [[(Double, Text)]]
+  deriving (Generic, Show, ToJSON, FromJSON)
+
+instance WebSocketMessage AppRequest CheckAnswer where
+  type ResponseT AppRequest CheckAnswer = CheckAnswerResult
 
 ----------------------------------------------------------------
 data DoReview

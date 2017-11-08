@@ -72,7 +72,7 @@ import qualified Data.Text.Lazy as TL
 --   return ()
 
 getCheckAnswerAudio :: CheckAnswerAudio
-  -> HandlerM CheckAnswerAudioResult
+  -> HandlerM CheckAnswerResult
 getCheckAnswerAudio (CheckAnswerAudio reading audioData) = do
   let melBsBuil = mconcat $ map putFloat32le
         $ map (\i -> (fromIntegral i) / 100000) $ audioData

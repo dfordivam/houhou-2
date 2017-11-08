@@ -17,6 +17,7 @@ executable         houhou2-frontend
                 AudioCapture
                 AudioProcessor
                 SrsWidget
+                SpeechRecog
                 FrontendCommon
 
     extensions:
@@ -46,6 +47,7 @@ executable         houhou2-frontend
                 , aeson
                 , containers
                 , ghcjs-dom
+                , ghcjs-dom-jsffi
                 , reflex
                 , reflex-dom
                 , reflex-dom-core

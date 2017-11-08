@@ -27,6 +27,7 @@ import Network.HTTP.Types.Status
 import qualified Data.Map as Map
 import Common (SrsReviewStats(..))
 import NLP.Julius.Interface (c_init_julius)
+import Text.MeCab (new)
 
 mainWebSocketHandler :: IO ()
 mainWebSocketHandler = do
@@ -34,8 +35,10 @@ mainWebSocketHandler = do
     HandlerState [] 20 Map.empty Map.empty [] (SrsReviewStats 0 0 0)
   dbConn <- openKanjiDB
   srsDbConn <- openSrsDB
+  m <- new ["mecab", "-d"
+           , "/home/divam/repos/mecab-tools/mecab-ipadic-neologd-output-files"]
   asrEng <- c_init_julius
-  let handlerEnv = HandlerEnv dbConn srsDbConn asrEng
+  let handlerEnv = HandlerEnv dbConn srsDbConn asrEng m
   runEnv 3000 (app handlerStateRef handlerEnv)
 
 -- audioWebSocket fh melDataRef = do
@@ -93,6 +96,7 @@ handler = HandlerWrapper $
   :<&> h getBrowseSrsItems
   :<&> h getGetNextReviewItem
   :<&> h getCheckAnswerAudio
+  :<&> h getCheckAnswer
   :<&> h getDoReview
   :<&> h getSrsItem
   :<&> h getEditSrsItem

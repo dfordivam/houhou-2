@@ -15,6 +15,7 @@ import Control.Exception (assert)
 import Control.Monad.RWS
 import Database.SQLite.Simple
 import NLP.Julius.Interface
+import Text.MeCab
 
 type HandlerM = RWST HandlerEnv () HandlerState IO
 
@@ -22,6 +23,7 @@ data HandlerEnv = HandlerEnv
   { kanjiDbConn :: Connection
   , srsDbConn :: Connection
   , asrEngine :: RecogMainPtr
+  , mecab :: MeCab
   }
 
 
@@ -55,9 +57,20 @@ makeLenses ''HandlerState
 -- Filter valid Kanji (no hiragana or katakana)
 getKanjis :: Text -> [Text]
 getKanjis inp = map T.pack $ map (:[]) $ filter isKanji $ T.unpack inp
-  where isKanji c = c > l && c < h
-        l = chr $ 13312 -- 0x3400
-        h = chr $ 40879 -- 0x9faf
+
+isJP :: Text -> Bool
+isJP = (all f) . T.unpack
+  where f c = isKana c || isKanji c
+
+-- 3040 - 30ff
+isKana c = c > l && c < h
+  where l = chr $ 12352
+        h = chr $ 12543
+
+-- 3400 - 9faf
+isKanji c = c > l && c < h
+ where l = chr $ 13312
+       h = chr $ 40879
 
 -- 1034|其の実|そのじつ|0||0:そ;2:じつ||||607|0
 -- 204|お化け屋敷|おばけやしき|0||1:ば;3:や;4:しき||||137|1

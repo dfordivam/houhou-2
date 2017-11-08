@@ -2,6 +2,7 @@ module SrsWidget where
 
 import FrontendCommon
 import AudioCapture
+import SpeechRecog
 
 import qualified Data.Text as T
 import qualified Data.Set as Set
@@ -414,7 +415,8 @@ reviewWidget = do
       uiButton (constDyn def) (text "Close Review")
 
     recordEv <- uiButton (constDyn def) (text "Record")
-    audioCaptureWidget recordEv
+    -- audioCaptureWidget recordEv
+    speechRecogWidget recordEv
 
     rec
       let reviewItemEv = fmapMaybeCheap identity $
