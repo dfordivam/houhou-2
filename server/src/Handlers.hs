@@ -644,9 +644,17 @@ getCheckAnswer :: CheckAnswer -> HandlerM CheckAnswerResult
 getCheckAnswer (CheckAnswer reading alt) = do
   pPrint alt
   let  f (c,t) = (,) <$> pure c <*> getKana t
-  kanas <- mapM (mapM f) alt
-  pPrint kanas
-  return $ AnswerCorrect
+  kanaAlts <- mapM (mapM f) alt
+  pPrint kanaAlts
+  return $ checkAnswerInt reading kanaAlts
+
+checkAnswerInt :: Text -> [[(Double, Text)]] -> CheckAnswerResult
+checkAnswerInt reading kanaAlts =
+  case elem reading kanas of
+    True -> AnswerCorrect
+    False -> AnswerIncorrect "T"
+  where
+    kanas = mconcat $ map (map snd) kanaAlts
 
 -- Convert Kanji to furigana (hiragana)
 getKana :: Text -> HandlerM (Text)

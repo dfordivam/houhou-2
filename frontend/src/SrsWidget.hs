@@ -414,10 +414,6 @@ reviewWidget = do
     closeEv <- divClass "fluid" $
       uiButton (constDyn def) (text "Close Review")
 
-    recordEv <- uiButton (constDyn def) (text "Record")
-    -- audioCaptureWidget recordEv
-    speechRecogWidget recordEv
-
     rec
       let reviewItemEv = fmapMaybeCheap identity $
             leftmost [initEv, nextReviewItemEv]
@@ -467,6 +463,12 @@ reviewWidgetView ri@(ReviewItem i k n s) = do
 
   (dr,inpTextValue) <- inputFieldWidget ri
 
+  drSpeech <- case n of
+    (Right (r,_)) ->
+      ((DoReview i ReadingReview) <$>) <$>
+        speechRecogWidget r
+    _ -> return never
+
   let notesRowAttr = ("class" =: "ui left aligned container")
          <> ("style" =: "height: 10rem;")
       notesTextAttr = ("style" =: "font-size: large;")
@@ -493,7 +495,7 @@ reviewWidgetView ri@(ReviewItem i k n s) = do
     return $ leftmost
       [UndoReview <$ ev1
       , AddAnswer i rt <$> tagDyn inpTextValue ev2]
-  return $ leftmost [evB,dr]
+  return $ leftmost [evB,dr, drSpeech]
 
 inputFieldWidget
   :: _
@@ -520,8 +522,7 @@ inputFieldWidget ri@(ReviewItem i k n s) = do
           divClass "field" $ do
             uiTextInput inpFieldAttr tiAttr
 
-    showResult b = do
-      let res = if b then "Correct" else "Incorrect"
+    showResult res = do
       divClass "row" $ text $ "Result: " <> res
 
   rec
@@ -537,7 +538,7 @@ reviewInputFieldHandler
      Reflex t)
  => TextInput t
  -> ReviewItem
- -> m (Event t DoReview, Event t Text, Event t Bool)
+ -> m (Event t DoReview, Event t Text, Event t Text)
 reviewInputFieldHandler ti (ReviewItem i k n s) = do
   let enterPress = ffilter (==13) (ti ^. textInput_keypress) -- 13 -> Enter
       correct = checkAnswer n <$> value ti
@@ -549,14 +550,19 @@ reviewInputFieldHandler ti (ReviewItem i k n s) = do
     sendResult = ffilter (== NextReview) (tagDyn dyn enterPress)
     dr = DoReview i rt <$> tagDyn correct sendResult
 
-    rt = case n of
-      (Left _) -> MeaningReview
-      (Right _) -> ReadingReview
+    (rt, ans) = case n of
+      (Left ((MeaningT m),_)) -> (MeaningReview,m)
+      (Right (r,_)) -> (ReadingReview,r)
 
     hiragana = case rt of
       MeaningReview -> never
       ReadingReview -> toHiragana <$> (ti ^. textInput_input)
-  return (dr, hiragana, tagDyn correct enterPress)
+    correctEv = tagDyn correct enterPress
+  -- the dr event will fire after the correctEv (on second enter press)
+  let resEv b = (if b
+        then "Correct : "
+        else "Incorrect : ") <> ans
+  return (dr, hiragana, resEv <$> correctEv)
 
 -- TODO
 -- For meaning reviews allow minor mistakes

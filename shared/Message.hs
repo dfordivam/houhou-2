@@ -124,7 +124,7 @@ data CheckAnswerAudio =
 data CheckAnswerResult
   = AnswerCorrect
   | AnswerIncorrect Text
-  deriving (Generic, Show, ToJSON, FromJSON)
+  deriving (Generic, Show, Eq, ToJSON, FromJSON)
 
 instance WebSocketMessage AppRequest CheckAnswerAudio where
   type ResponseT AppRequest CheckAnswerAudio = CheckAnswerResult
